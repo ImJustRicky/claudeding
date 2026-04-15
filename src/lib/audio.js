@@ -1,0 +1,202 @@
+import { spawn } from 'child_process';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { platform, homedir } from 'os';
+import { join, dirname, basename } from 'path';
+import { fileURLToPath } from 'url';
+import { loadConfig, updateConfig } from './config.js';
+import { isClaudeCodeFocused } from './focus.js';
+
+const DEBOUNCE_FILE = join(homedir(), '.claudeding-lastplay');
+const DEBOUNCE_MS = 1500; // 1.5 seconds between sounds
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const AUDIO_DIR = join(__dirname, '..', 'audio');
+const LEGACY_SOUNDS_DIR = join(__dirname, '..', 'sounds');
+
+// Get list of bundled sounds for each event type
+export function getBundledSounds() {
+  const result = { complete: [], feedback: [] };
+
+  for (const event of ['complete', 'feedback']) {
+    const dir = join(AUDIO_DIR, event);
+    if (!existsSync(dir)) continue;
+
+    const files = readdirSync(dir).filter(f => f.endsWith('.wav') || f.endsWith('.mp3'));
+    result[event] = files.map(f => {
+      const ext = f.endsWith('.mp3') ? '.mp3' : '.wav';
+      return {
+        name: basename(f, ext),
+        file: f,
+        path: join(dir, f)
+      };
+    });
+  }
+
+  return result;
+}
+
+// Get currently selected sounds from config
+export function getSelectedSounds() {
+  const config = loadConfig();
+  return {
+    complete: config.sounds?.complete || null,
+    feedback: config.sounds?.feedback || null
+  };
+}
+
+// Set selected sound (by name for bundled, or path for custom)
+export function setSelectedSound(event, nameOrPath) {
+  const sounds = { [event]: nameOrPath };
+  updateConfig({ sounds });
+}
+
+// Resolve sound path from name or custom path
+function getSoundPath(event, overrideName = null) {
+  const config = loadConfig();
+  const selected = overrideName || config.sounds?.[event];
+
+  // If it's an absolute path and exists, use it
+  if (selected && selected.startsWith('/') && existsSync(selected)) {
+    return selected;
+  }
+
+  // If it's a name, look in bundled audio folder
+  if (selected) {
+    const bundled = getBundledSounds();
+    const found = bundled[event]?.find(s => s.name === selected);
+    if (found) return found.path;
+  }
+
+  // Fallback: prefer sound named after the event (e.g., "complete" for complete event)
+  const bundled = getBundledSounds();
+  const defaultSound = bundled[event]?.find(s => s.name === event);
+  if (defaultSound) {
+    return defaultSound.path;
+  }
+
+  // Otherwise use first bundled sound if available
+  if (bundled[event]?.length > 0) {
+    return bundled[event][0].path;
+  }
+
+  // Legacy fallback to old sounds dir
+  const legacyPath = join(LEGACY_SOUNDS_DIR, `${event}.wav`);
+  if (existsSync(legacyPath)) {
+    return legacyPath;
+  }
+
+  return null;
+}
+
+function playMacOS(filePath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('afplay', [filePath]);
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`afplay exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  });
+}
+
+function playLinux(filePath) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('paplay', [filePath]);
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        const fallback = spawn('aplay', [filePath]);
+        fallback.on('close', (fallbackCode) => {
+          if (fallbackCode === 0) resolve();
+          else reject(new Error(`Audio playback failed`));
+        });
+        fallback.on('error', reject);
+      }
+    });
+
+    proc.on('error', () => {
+      const fallback = spawn('aplay', [filePath]);
+      fallback.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Audio playback failed`));
+      });
+      fallback.on('error', reject);
+    });
+  });
+}
+
+function playWindows(filePath) {
+  return new Promise((resolve, reject) => {
+    const script = `(New-Object Media.SoundPlayer '${filePath.replace(/'/g, "''")}').PlaySync()`;
+    const proc = spawn('powershell', ['-c', script]);
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`PowerShell exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  });
+}
+
+function shouldDebounce() {
+  try {
+    if (!existsSync(DEBOUNCE_FILE)) return false;
+    const lastPlay = parseInt(readFileSync(DEBOUNCE_FILE, 'utf-8'), 10);
+    return Date.now() - lastPlay < DEBOUNCE_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markPlayed() {
+  try {
+    writeFileSync(DEBOUNCE_FILE, Date.now().toString());
+  } catch {
+    // Ignore write errors
+  }
+}
+
+export async function playSound(event, overrideName = null) {
+  const config = loadConfig();
+
+  // Skip sound if muted
+  if (config.mute) {
+    return;
+  }
+
+  // Skip sound if Claude Code / terminal is focused (user is already looking)
+  if (config.skipWhenFocused !== false && isClaudeCodeFocused()) {
+    return;
+  }
+
+  // Debounce: skip if sound played recently (prevents spam from multiple instances)
+  if (shouldDebounce()) {
+    return;
+  }
+
+  const soundPath = getSoundPath(event, overrideName);
+
+  if (!soundPath || !existsSync(soundPath)) {
+    console.warn(`Warning: Sound file not found for "${event}"`);
+    return;
+  }
+
+  const os = platform();
+
+  try {
+    markPlayed(); // Mark before playing to prevent race conditions
+
+    if (os === 'darwin') {
+      await playMacOS(soundPath);
+    } else if (os === 'linux') {
+      await playLinux(soundPath);
+    } else if (os === 'win32') {
+      await playWindows(soundPath);
+    } else {
+      console.warn(`Warning: Unsupported platform: ${os}`);
+    }
+  } catch (err) {
+    console.warn(`Warning: Failed to play sound: ${err.message}`);
+  }
+}

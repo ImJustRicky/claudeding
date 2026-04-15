@@ -1,0 +1,41 @@
+{
+  "name": "claudeding",
+  "version": "1.0.0",
+  "description": "Audio notifications for Claude Code - hear when tasks complete or need input",
+  "type": "module",
+  "bin": {
+    "claudeding": "./bin/claudeding.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "notifications",
+    "audio",
+    "ding",
+    "cli"
+  ],
+  "author": "ImJustRicky",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ImJustRicky/claudeding.git"
+  },
+  "homepage": "https://github.com/ImJustRicky/claudeding#readme",
+  "bugs": {
+    "url": "https://github.com/ImJustRicky/claudeding/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "inquirer": "^13.4.1"
+  }
+}
