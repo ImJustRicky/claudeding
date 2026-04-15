@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>claudeding</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      padding: 12px;
+      min-width: 220px;
+      user-select: none;
+      cursor: default;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    .title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .status {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #2d5a2d;
+      color: #7dff7d;
+    }
+    .status.muted {
+      background: #5a2d2d;
+      color: #ff7d7d;
+    }
+    .status.snoozing {
+      background: #5a5a2d;
+      color: #ffff7d;
+    }
+    .section {
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 4px;
+      background: #2a2a2a;
+      border: none;
+      border-radius: 6px;
+      color: #e0e0e0;
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn:hover {
+      background: #3a3a3a;
+    }
+    .btn:active {
+      background: #4a4a4a;
+    }
+    .btn.active {
+      background: #1a4a1a;
+    }
+    .last-event {
+      font-size: 11px;
+      color: #888;
+      padding: 6px 0;
+    }
+    .quit {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #333;
+    }
+    .quit .btn {
+      color: #ff6b6b;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="title">claudeding</span>
+    <span class="status" id="status">Active</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Quick Actions</div>
+    <button class="btn" id="muteBtn">Mute sounds</button>
+    <button class="btn" id="snooze15">Snooze 15 min</button>
+    <button class="btn" id="snooze30">Snooze 30 min</button>
+    <button class="btn" id="snooze60">Snooze 1 hour</button>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Last Event</div>
+    <div class="last-event" id="lastEvent">No events yet</div>
+  </div>
+
+  <div class="quit">
+    <button class="btn" id="quitBtn">Quit Menu Bar</button>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    // Update UI based on state
+    function updateUI(state) {
+      const statusEl = document.getElementById('status');
+      const muteBtn = document.getElementById('muteBtn');
+      const lastEventEl = document.getElementById('lastEvent');
+
+      if (state.snoozing) {
+        statusEl.textContent = `Snoozing (${state.snoozeRemaining})`;
+        statusEl.className = 'status snoozing';
+      } else if (state.muted) {
+        statusEl.textContent = 'Muted';
+        statusEl.className = 'status muted';
+      } else {
+        statusEl.textContent = 'Active';
+        statusEl.className = 'status';
+      }
+
+      muteBtn.textContent = state.muted ? 'Unmute sounds' : 'Mute sounds';
+      muteBtn.className = state.muted ? 'btn active' : 'btn';
+
+      if (state.lastEvent) {
+        const time = new Date(state.lastEvent.time).toLocaleTimeString();
+        lastEventEl.textContent = `${state.lastEvent.type} - ${time}`;
+      }
+    }
+
+    // Request initial state
+    ipcRenderer.send('get-state');
+    ipcRenderer.on('state', (event, state) => updateUI(state));
+
+    // Button handlers
+    document.getElementById('muteBtn').onclick = () => ipcRenderer.send('toggle-mute');
+    document.getElementById('snooze15').onclick = () => ipcRenderer.send('snooze', '15m');
+    document.getElementById('snooze30').onclick = () => ipcRenderer.send('snooze', '30m');
+    document.getElementById('snooze60').onclick = () => ipcRenderer.send('snooze', '1h');
+    document.getElementById('quitBtn').onclick = () => ipcRenderer.send('quit');
+
+    // Refresh state periodically
+    setInterval(() => ipcRenderer.send('get-state'), 1000);
+  </script>
+</body>
+</html>

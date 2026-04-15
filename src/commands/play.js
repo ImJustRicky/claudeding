@@ -1,11 +1,14 @@
 import { playSound } from '../lib/audio.js';
 import { showNotification } from '../lib/notify.js';
+import { loadConfig } from '../lib/config.js';
 import { basename } from 'path';
-import { appendFileSync } from 'fs';
+import { appendFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
 const DEBUG_LOG = join(homedir(), '.claudeding-debug.log');
+const LAST_EVENT_FILE = join(homedir(), '.claudeding-lastevent');
+const HISTORY_FILE = join(homedir(), '.claudeding-history.jsonl');
 
 function debugLog(message) {
   if (!process.env.CLAUDEDING_DEBUG) return;
@@ -100,9 +103,32 @@ export default async function play(event, options) {
   const context = parseContext(stdinData);
   const projectName = getProjectName(context);
 
+  // Get project directory for per-project config
+  const projectDir = context.cwd || context.workingDirectory || context.working_directory ||
+    process.env.CLAUDE_CWD || process.env.CLAUDE_WORKING_DIR || process.env.CLAUDE_PROJECT_DIR || process.env.PWD;
+
+  const eventData = {
+    event,
+    project: projectName,
+    time: Date.now()
+  };
+
+  // Log event for tray
+  try {
+    writeFileSync(LAST_EVENT_FILE, JSON.stringify(eventData));
+  } catch {}
+
+  // Log to history if stats enabled (minimal: one line append)
+  const config = loadConfig();
+  if (config.logStats) {
+    try {
+      appendFileSync(HISTORY_FILE, JSON.stringify(eventData) + '\n');
+    } catch {}
+  }
+
   // Play sound and show notification in parallel
   await Promise.all([
-    playSound(event, null, { force: options?.force }),
+    playSound(event, null, { force: options?.force, projectDir }),
     showNotification(event, projectName)
   ]);
 }

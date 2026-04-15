@@ -3,8 +3,10 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { platform, homedir } from 'os';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
-import { loadConfig, updateConfig } from './config.js';
+import { loadConfig, updateConfig, getEffectiveConfig } from './config.js';
 import { isClaudeCodeFocused } from './focus.js';
+import { isSnoozing } from '../commands/snooze.js';
+import { isDndActive } from './dnd.js';
 
 const DEBOUNCE_FILE = join(homedir(), '.claudeding-lastplay');
 const DEBOUNCE_MS = 1500; // 1.5 seconds between sounds
@@ -189,7 +191,7 @@ function markPlayed() {
 }
 
 export async function playSound(event, overrideName = null, options = {}) {
-  const config = loadConfig();
+  const config = getEffectiveConfig(options.projectDir);
   const force = options.force === true;
 
   // Skip checks if force flag is set (for manual testing)
@@ -199,8 +201,18 @@ export async function playSound(event, overrideName = null, options = {}) {
       return;
     }
 
+    // Skip sound if snoozing
+    if (isSnoozing()) {
+      return;
+    }
+
     // Skip sound during quiet hours
     if (isQuietHours()) {
+      return;
+    }
+
+    // Skip sound if system DND/Focus mode is on (if respectDnd is enabled)
+    if (isDndActive()) {
       return;
     }
 

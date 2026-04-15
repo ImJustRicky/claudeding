@@ -32,6 +32,11 @@ You'll also see a system notification showing which project triggered it.
 - **Random messages**: Fun notifications with emojis like "🎉 All done!" and "👋 Need your input!"
 - **Volume control**: Adjust notification volume (0-100)
 - **Quiet hours**: Automatically mute sounds during specified hours
+- **Snooze**: Temporarily pause sounds (`claudeding snooze 30m`)
+- **Menu bar widget**: Quick controls from your menu bar (macOS)
+- **Per-project sounds**: Different sounds for different projects
+- **System DND respect**: Optional integration with macOS Focus mode
+- **Usage stats**: Track your Claude usage patterns (opt-in)
 
 Setup also adds instructions to your `~/.claude/CLAUDE.md` so Claude knows how to control notifications when you ask (e.g., "mute the dings").
 
@@ -112,6 +117,67 @@ claudeding disable error    # Stop playing error sounds
 claudeding enable error     # Re-enable error sounds
 ```
 
+### `claudeding snooze [duration]`
+
+Temporarily pause all sounds.
+
+```bash
+claudeding snooze 30m       # Snooze for 30 minutes
+claudeding snooze 2h        # Snooze for 2 hours
+claudeding snooze           # Check snooze status
+claudeding snooze --off     # Cancel snooze
+```
+
+### `claudeding tray`
+
+Start a menu bar widget (macOS only). Shows status and quick controls.
+
+```bash
+claudeding tray
+```
+
+Features:
+- **Live status icon**: 🔔 idle, ✅ complete, 👋 needs input, ❌ error, 💤 snoozing, 🔇 muted
+- Mute/unmute toggle
+- Quick snooze buttons (15m, 30m, 1h, 2h)
+- Test sounds
+- Native macOS menu
+- Runs in background
+
+### `claudeding stats`
+
+View usage statistics (off by default to save resources).
+
+```bash
+claudeding stats --on     # Enable logging
+claudeding stats          # View stats
+claudeding stats --off    # Disable logging
+```
+
+Example output:
+
+```
+claudeding Stats
+
+Events:
+  Today:     12 complete, 8 feedback, 2 errors
+  This week: 84 complete, 45 feedback, 7 errors
+  This month: 312 complete, 201 feedback, 23 errors
+  All time: 536 total events
+
+Insights:
+  Avg time between feedback: 14m
+  Error rate: 4.3%
+  Peak coding hour: 2PM
+
+Top Projects:
+  1. my-app (234 events)
+  2. api-server (156 events)
+  3. docs (89 events)
+
+History file: 42.1 KB (536 events)
+```
+
 ## Configuration
 
 Config is stored at `~/.claudeding.json`:
@@ -128,6 +194,9 @@ Config is stored at `~/.claudeding.json`:
   "volume": 100,
   "skipWhenFocused": true,
   "afkTimeout": 30,
+  "respectDnd": false,
+  "useProjectConfig": false,
+  "logStats": false,
   "quietHours": {
     "enabled": false,
     "start": "22:00",
@@ -146,9 +215,25 @@ Config is stored at `~/.claudeding.json`:
 | `volume` | Volume level 0-100 (default: 100) |
 | `skipWhenFocused` | Skip sounds when terminal is focused (`true`/`false`) |
 | `afkTimeout` | Seconds of idle time before playing sound even when focused. Set to `0` to disable AFK detection |
+| `respectDnd` | Skip sounds when system DND/Focus mode is on (`true`/`false`, default: `false`) |
+| `useProjectConfig` | Use `.claudeding.json` in project root if present (`true`/`false`, default: `false`) |
+| `logStats` | Log events to history file for stats (`true`/`false`, default: `false`) |
 | `quietHours.enabled` | Enable quiet hours (`true`/`false`) |
 | `quietHours.start` | Start time in 24-hour format (e.g., `"22:00"`) |
 | `quietHours.end` | End time in 24-hour format (e.g., `"08:00"`) |
+
+### Per-Project Config
+
+With `useProjectConfig: true`, you can create a `.claudeding.json` in any project root to override global settings:
+
+```json
+{
+  "sounds": {
+    "complete": "chord"
+  },
+  "volume": 50
+}
+```
 
 ## Platform Support
 

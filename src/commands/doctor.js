@@ -4,6 +4,8 @@ import { execSync } from 'child_process';
 import { loadConfig, getConfigPath } from '../lib/config.js';
 import { checkHooksInstalled } from '../lib/hooks.js';
 import { getBundledSounds } from '../lib/audio.js';
+import { isSnoozing, getSnoozeRemaining } from './snooze.js';
+import { isDndActive } from '../lib/dnd.js';
 
 function check(name, condition, fix = null) {
   const status = condition ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m';
@@ -80,6 +82,7 @@ export default async function doctor() {
   console.log('Configuration:');
   allGood &= check('Config file exists', existsSync(getConfigPath()), 'Run: claudeding setup');
   allGood &= check('Not muted', !config.mute, 'Run: claudeding mute --off');
+  allGood &= check('Not snoozing', !isSnoozing(), 'Run: claudeding snooze --off');
   console.log('');
 
   // Hooks
@@ -119,6 +122,9 @@ export default async function doctor() {
   console.log(`  Skip when focused: ${config.skipWhenFocused !== false ? 'yes' : 'no'}`);
   console.log(`  AFK timeout: ${config.afkTimeout ?? 30}s`);
   console.log(`  Quiet hours: ${config.quietHours?.enabled ? `${config.quietHours.start} - ${config.quietHours.end}` : 'off'}`);
+  console.log(`  Respect system DND: ${config.respectDnd ? 'yes' : 'no'}${config.respectDnd && isDndActive() ? ' (currently active)' : ''}`);
+  console.log(`  Per-project config: ${config.useProjectConfig ? 'yes' : 'no'}`);
+  console.log(`  Menu bar: Run "claudeding tray" to start (macOS only)`);
   console.log('');
 
   // Summary

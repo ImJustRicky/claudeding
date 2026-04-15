@@ -8,6 +8,9 @@ import sounds from '../src/commands/sounds.js';
 import mute from '../src/commands/mute.js';
 import doctor from '../src/commands/doctor.js';
 import { enable, disable } from '../src/commands/toggle.js';
+import snooze from '../src/commands/snooze.js';
+import tray from '../src/commands/tray.js';
+import stats from '../src/commands/stats.js';
 
 program
   .name('claudeding')
@@ -64,5 +67,23 @@ program
   .command('disable <event>')
   .description('Disable sound for event (complete, feedback, or error)')
   .action(disable);
+
+program
+  .command('snooze [duration]')
+  .description('Pause sounds temporarily (e.g., 30m, 2h)')
+  .option('--off', 'Cancel snooze')
+  .action(snooze);
+
+program
+  .command('tray')
+  .description('Start menu bar widget (macOS only)')
+  .action(tray);
+
+program
+  .command('stats')
+  .description('View usage statistics (off by default)')
+  .option('--on', 'Enable stats logging')
+  .option('--off', 'Disable stats logging')
+  .action(stats);
 
 program.parse();
