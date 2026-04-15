@@ -61,12 +61,12 @@ program
 
 program
   .command('enable <event>')
-  .description('Enable sound for event (complete, feedback, or error)')
+  .description('Enable sound for event (complete, feedback, error, thinking, farts)')
   .action(enable);
 
 program
   .command('disable <event>')
-  .description('Disable sound for event (complete, feedback, or error)')
+  .description('Disable sound for event (complete, feedback, error, thinking, farts)')
   .action(disable);
 
 program

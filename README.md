@@ -253,11 +253,11 @@ Disable with `claudeding disable thinking`.
 
 1% chance of a random fart sound on any notification:
 
-```json
-{ "easterEggs": true }
+```bash
+claudeding enable farts
 ```
 
-Add to `~/.claudeding.json` to enable.
+Disable with `claudeding disable farts`.
 
 ## Platform Support
 

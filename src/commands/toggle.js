@@ -1,8 +1,12 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import { updateConfig, loadConfig } from '../lib/config.js';
 
 const SETTINGS_PATH = join(homedir(), '.claude', 'settings.json');
+
+// Config-based features (not hooks)
+const CONFIG_FEATURES = ['farts', 'fart', 'eastereggs'];
 
 const EVENT_MAP = {
   thinking: 'UserPromptSubmit',
@@ -66,10 +70,22 @@ function addClaudedingHook(hookArray, command) {
 }
 
 export async function disable(event) {
+  // Handle config-based features
+  if (CONFIG_FEATURES.includes(event)) {
+    const config = loadConfig();
+    if (!config.easterEggs) {
+      console.log('Easter eggs are already disabled.');
+      return;
+    }
+    updateConfig({ easterEggs: false });
+    console.log('Disabled easter eggs (farts).');
+    return;
+  }
+
   const validEvents = ['thinking', 'complete', 'feedback', 'error'];
 
   if (!validEvents.includes(event)) {
-    console.error(`Error: Invalid event "${event}". Use: thinking, complete, feedback, or error`);
+    console.error(`Error: Invalid event "${event}". Use: thinking, complete, feedback, error, or farts`);
     process.exit(1);
   }
 
@@ -107,10 +123,22 @@ export async function disable(event) {
 }
 
 export async function enable(event) {
+  // Handle config-based features
+  if (CONFIG_FEATURES.includes(event)) {
+    const config = loadConfig();
+    if (config.easterEggs) {
+      console.log('Easter eggs are already enabled.');
+      return;
+    }
+    updateConfig({ easterEggs: true });
+    console.log('Enabled easter eggs (1% chance of farts).');
+    return;
+  }
+
   const validEvents = ['thinking', 'complete', 'feedback', 'error'];
 
   if (!validEvents.includes(event)) {
-    console.error(`Error: Invalid event "${event}". Use: thinking, complete, feedback, or error`);
+    console.error(`Error: Invalid event "${event}". Use: thinking, complete, feedback, error, or farts`);
     process.exit(1);
   }
 
