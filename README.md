@@ -23,6 +23,13 @@ Once set up, you'll hear:
 
 You'll also see a system notification showing which project triggered it.
 
+### Smart Features
+
+- **Focus detection**: No sound when you're looking at the terminal (you can already see it)
+- **AFK detection**: Plays sound if you've been idle 30+ seconds, even if terminal is focused
+- **Debouncing**: Multiple Claude instances won't spam you with sounds
+- **Random messages**: Fun notifications with emojis like "🎉 All done!" and "👋 Need your input!"
+
 Setup also adds instructions to your `~/.claude/CLAUDE.md` so Claude knows how to control notifications when you ask (e.g., "mute the dings").
 
 ## Commands
@@ -93,14 +100,19 @@ Config is stored at `~/.claudeding.json`:
   },
   "notify": true,
   "mute": false,
-  "skipWhenFocused": true
+  "skipWhenFocused": true,
+  "afkTimeout": 30
 }
 ```
 
-- **sounds.complete** / **sounds.feedback**: Name of a bundled sound or absolute path to a custom WAV/MP3 file. `null` uses the default.
-- **notify**: Set to `false` to disable system notifications (sound only).
-- **mute**: Set to `true` to mute sounds (notifications still show).
-- **skipWhenFocused**: When `true` (default), sounds don't play if your terminal is focused. Only dings when you're away!
+| Option | Description |
+|--------|-------------|
+| `sounds.complete` | Name of bundled sound or path to custom WAV/MP3. `null` = default |
+| `sounds.feedback` | Name of bundled sound or path to custom WAV/MP3. `null` = default |
+| `notify` | Show system notifications (`true`/`false`) |
+| `mute` | Mute all sounds (`true`/`false`) |
+| `skipWhenFocused` | Skip sounds when terminal is focused (`true`/`false`) |
+| `afkTimeout` | Seconds of idle time before playing sound even when focused. Set to `0` to disable AFK detection |
 
 ## Platform Support
 
@@ -118,7 +130,7 @@ For better notification branding, install terminal-notifier:
 brew install terminal-notifier
 ```
 
-Without it, notifications show as "Script Editor". With it, they show properly branded.
+Without it, notifications show as "Script Editor". With it, they show your terminal's icon (VS Code, iTerm, etc.).
 
 ## How it works
 

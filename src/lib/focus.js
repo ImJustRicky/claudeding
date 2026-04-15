@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import { platform } from 'os';
+import { loadConfig } from './config.js';
 
 // Check if Claude Code / terminal is currently focused
 // Returns true if focused (should skip sound), false otherwise
@@ -22,43 +23,64 @@ export function isClaudeCodeFocused() {
   return false;
 }
 
-function isFocusedMacOS() {
-  // Use lsappinfo which works better in subprocess contexts than osascript
+function getIdleSeconds() {
   try {
-    const frontApp = execSync('lsappinfo info -only name $(lsappinfo front) 2>/dev/null', {
-      encoding: 'utf-8',
-      shell: true
-    }).toLowerCase();
-
-    // Check if it's a terminal or Claude Code
-    const terminalApps = [
-      'terminal',
-      'iterm',
-      'hyper',
-      'alacritty',
-      'kitty',
-      'warp',
-      'wezterm',
-      'tabby',
-      'cursor',
-      'code',
-      'visual studio code',
-      'zed',
-      'ghostty',
-    ];
-
-    return terminalApps.some(app => frontApp.includes(app));
+    const idle = execSync(
+      "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'",
+      { encoding: 'utf-8', shell: '/bin/bash' }
+    ).trim();
+    return parseInt(idle, 10) || 0;
   } catch {
-    // Fallback to osascript if lsappinfo fails
-    const script = 'tell application "System Events" to get name of first application process whose frontmost is true';
-    const result = execSync(`osascript -e '${script}'`, { encoding: 'utf-8' }).trim().toLowerCase();
+    return 0;
+  }
+}
 
-    const terminalApps = [
-      'terminal', 'iterm', 'hyper', 'alacritty', 'kitty', 'warp',
-      'wezterm', 'tabby', 'cursor', 'code', 'visual studio code', 'zed', 'ghostty'
-    ];
+function isFocusedMacOS() {
+  const terminalApps = [
+    'terminal', 'iterm', 'hyper', 'alacritty', 'kitty', 'warp',
+    'wezterm', 'tabby', 'cursor', 'code', 'visual studio code',
+    'zed', 'ghostty', 'rio'
+  ];
 
-    return terminalApps.some(app => result.includes(app));
+  // Try multiple methods to detect frontmost app
+  try {
+    let isFocused = false;
+
+    // Method 1: lsappinfo (most reliable in subprocesses)
+    const lsResult = execSync(
+      'lsappinfo info -only name "$(lsappinfo front)" 2>/dev/null || echo ""',
+      { encoding: 'utf-8', shell: '/bin/bash' }
+    ).toLowerCase();
+
+    if (lsResult && terminalApps.some(app => lsResult.includes(app))) {
+      isFocused = true;
+    }
+
+    // Method 2: osascript with System Events (fallback)
+    if (!isFocused) {
+      const asResult = execSync(
+        `osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo ""`,
+        { encoding: 'utf-8', shell: '/bin/bash' }
+      ).toLowerCase().trim();
+
+      if (asResult && terminalApps.some(app => asResult.includes(app))) {
+        isFocused = true;
+      }
+    }
+
+    // If terminal is focused but user is AFK, play sound anyway
+    if (isFocused) {
+      const config = loadConfig();
+      const idleSeconds = getIdleSeconds();
+      const afkTimeout = config.afkTimeout ?? 30;
+      if (afkTimeout > 0 && idleSeconds >= afkTimeout) {
+        return false; // AFK, play sound
+      }
+    }
+
+    return isFocused;
+  } catch {
+    return false;
   }
 }
 

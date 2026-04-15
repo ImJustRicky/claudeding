@@ -11,7 +11,8 @@ const DEFAULT_CONFIG = {
   },
   notify: true,
   mute: false,
-  skipWhenFocused: true  // Don't play sounds when terminal/Claude Code is focused
+  skipWhenFocused: true,  // Don't play sounds when terminal/Claude Code is focused
+  afkTimeout: 30          // Seconds of idle time before considering user AFK (plays sound even if focused)
 };
 
 export function getConfigPath() {
