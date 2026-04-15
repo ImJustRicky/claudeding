@@ -23,28 +23,43 @@ export function isClaudeCodeFocused() {
 }
 
 function isFocusedMacOS() {
-  // Get the frontmost application name
-  const script = 'tell application "System Events" to get name of first application process whose frontmost is true';
-  const result = execSync(`osascript -e '${script}'`, { encoding: 'utf-8' }).trim().toLowerCase();
+  // Use lsappinfo which works better in subprocess contexts than osascript
+  try {
+    const frontApp = execSync('lsappinfo info -only name $(lsappinfo front) 2>/dev/null', {
+      encoding: 'utf-8',
+      shell: true
+    }).toLowerCase();
 
-  // Check if it's a terminal or Claude Code
-  const terminalApps = [
-    'terminal',
-    'iterm',
-    'iterm2',
-    'hyper',
-    'alacritty',
-    'kitty',
-    'warp',
-    'wezterm',
-    'tabby',
-    'cursor',      // Cursor IDE
-    'code',        // VS Code
-    'visual studio code',
-    'zed',
-  ];
+    // Check if it's a terminal or Claude Code
+    const terminalApps = [
+      'terminal',
+      'iterm',
+      'hyper',
+      'alacritty',
+      'kitty',
+      'warp',
+      'wezterm',
+      'tabby',
+      'cursor',
+      'code',
+      'visual studio code',
+      'zed',
+      'ghostty',
+    ];
 
-  return terminalApps.some(app => result.includes(app));
+    return terminalApps.some(app => frontApp.includes(app));
+  } catch {
+    // Fallback to osascript if lsappinfo fails
+    const script = 'tell application "System Events" to get name of first application process whose frontmost is true';
+    const result = execSync(`osascript -e '${script}'`, { encoding: 'utf-8' }).trim().toLowerCase();
+
+    const terminalApps = [
+      'terminal', 'iterm', 'hyper', 'alacritty', 'kitty', 'warp',
+      'wezterm', 'tabby', 'cursor', 'code', 'visual studio code', 'zed', 'ghostty'
+    ];
+
+    return terminalApps.some(app => result.includes(app));
+  }
 }
 
 function isFocusedLinux() {
