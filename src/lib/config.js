@@ -9,7 +9,8 @@ const DEFAULT_CONFIG = {
   sounds: {
     complete: null,
     feedback: null,
-    error: null
+    error: null,
+    thinking: null
   },
   notify: true,
   mute: false,
@@ -20,6 +21,7 @@ const DEFAULT_CONFIG = {
   useProjectConfig: false, // Use .claudeding.json in project root if present
   showTray: false,        // Show menu bar widget (macOS only)
   logStats: false,        // Log events to ~/.claudeding-history.jsonl (off by default)
+  easterEggs: false,      // Enable easter eggs (off by default)
   quietHours: {
     enabled: false,
     start: '22:00',       // 24-hour format

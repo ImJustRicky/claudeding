@@ -87,6 +87,7 @@ export default async function doctor() {
 
   // Hooks
   console.log('Hooks:');
+  console.log(`  \x1b[90m○\x1b[0m UserPromptSubmit (thinking): ${hooks.userPromptSubmit ? 'enabled' : 'off (optional)'}`);
   allGood &= check('Notification hook (feedback)', hooks.notification, 'Run: claudeding setup');
   allGood &= check('Stop hook (complete)', hooks.stop, 'Run: claudeding setup');
   allGood &= check('PostToolUseFailure hook (error)', hooks.postToolUseFailure, 'Run: claudeding setup');
@@ -102,9 +103,11 @@ export default async function doctor() {
   const completeSound = sounds.complete.length > 0;
   const feedbackSound = sounds.feedback.length > 0;
   const errorSound = sounds.error.length > 0;
+  const thinkingSound = sounds.thinking.length > 0;
   allGood &= check('Complete sounds available', completeSound);
   allGood &= check('Feedback sounds available', feedbackSound);
   allGood &= check('Error sounds available', errorSound);
+  allGood &= check('Thinking sounds available', thinkingSound);
   console.log('');
 
   // Notifications

@@ -91,10 +91,10 @@ export default async function play(event, options) {
   debugLog(`CLAUDE env vars: ${claudeEnvVars || '(none)'}`);
   debugLog(`PWD: ${process.env.PWD}`);
 
-  const validEvents = ['complete', 'feedback', 'error'];
+  const validEvents = ['complete', 'feedback', 'error', 'thinking'];
 
   if (!validEvents.includes(event)) {
-    console.error(`Error: Invalid event "${event}". Use "complete", "feedback", or "error".`);
+    console.error(`Error: Invalid event "${event}". Use "complete", "feedback", "error", or "thinking".`);
     process.exit(1);
   }
 
@@ -126,9 +126,13 @@ export default async function play(event, options) {
     } catch {}
   }
 
-  // Play sound and show notification in parallel
-  await Promise.all([
-    playSound(event, null, { force: options?.force, projectDir }),
-    showNotification(event, projectName)
-  ]);
+  // Play sound first (to check if easter egg triggered)
+  const result = await playSound(event, null, { force: options?.force, projectDir });
+
+  // Skip notification for thinking and easter eggs (playful sounds = sound only)
+  const skipNotification = event === 'thinking' || result?.easterEgg;
+
+  if (!skipNotification && result?.played) {
+    await showNotification(event, projectName);
+  }
 }

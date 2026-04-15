@@ -11,6 +11,7 @@ import { enable, disable } from '../src/commands/toggle.js';
 import snooze from '../src/commands/snooze.js';
 import tray from '../src/commands/tray.js';
 import stats from '../src/commands/stats.js';
+import stopThinkingCmd from '../src/commands/stopThinking.js';
 
 program
   .name('claudeding')
@@ -85,5 +86,10 @@ program
   .option('--on', 'Enable stats logging')
   .option('--off', 'Disable stats logging')
   .action(stats);
+
+program
+  .command('stop-thinking')
+  .description('Stop thinking music (used internally by hooks)')
+  .action(stopThinkingCmd);
 
 program.parse();

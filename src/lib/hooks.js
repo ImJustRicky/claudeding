@@ -7,6 +7,27 @@ const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json');
 const BACKUP_PATH = join(CLAUDE_DIR, 'settings.json.claudeding-backup');
 
 const CLAUDEDING_HOOKS = {
+  UserPromptSubmit: [
+    {
+      hooks: [
+        {
+          type: 'command',
+          command: 'claudeding play thinking'
+        }
+      ]
+    }
+  ],
+  PreToolUse: [
+    {
+      matcher: '',
+      hooks: [
+        {
+          type: 'command',
+          command: 'claudeding stop-thinking'
+        }
+      ]
+    }
+  ],
   Notification: [
     {
       matcher: '',
@@ -94,6 +115,9 @@ export function installHooks() {
     settings.hooks = {};
   }
 
+  // NOTE: UserPromptSubmit (thinking/Jeopardy) is NOT installed by default
+  // Users can enable with: claudeding enable thinking
+
   // Add Notification hooks if not already present
   if (!hasClaudedingHook(settings.hooks.Notification)) {
     settings.hooks.Notification = [
@@ -132,6 +156,11 @@ export function uninstallHooks() {
 
   let removed = false;
 
+  if (hasClaudedingHook(settings.hooks.UserPromptSubmit)) {
+    settings.hooks.UserPromptSubmit = removeClaudedingHooks(settings.hooks.UserPromptSubmit);
+    removed = true;
+  }
+
   if (hasClaudedingHook(settings.hooks.Notification)) {
     settings.hooks.Notification = removeClaudedingHooks(settings.hooks.Notification);
     removed = true;
@@ -148,6 +177,9 @@ export function uninstallHooks() {
   }
 
   // Clean up empty arrays
+  if (settings.hooks.UserPromptSubmit?.length === 0) {
+    delete settings.hooks.UserPromptSubmit;
+  }
   if (settings.hooks.Notification?.length === 0) {
     delete settings.hooks.Notification;
   }
@@ -169,6 +201,7 @@ export function uninstallHooks() {
 export function checkHooksInstalled() {
   const settings = loadSettings();
   return {
+    userPromptSubmit: hasClaudedingHook(settings.hooks?.UserPromptSubmit),
     notification: hasClaudedingHook(settings.hooks?.Notification),
     stop: hasClaudedingHook(settings.hooks?.Stop),
     postToolUseFailure: hasClaudedingHook(settings.hooks?.PostToolUseFailure)

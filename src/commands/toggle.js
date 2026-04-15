@@ -5,12 +5,16 @@ import { join } from 'path';
 const SETTINGS_PATH = join(homedir(), '.claude', 'settings.json');
 
 const EVENT_MAP = {
+  thinking: 'UserPromptSubmit',
+  'stop-thinking': 'PreToolUse',
   complete: 'Stop',
   feedback: 'Notification',
   error: 'PostToolUseFailure'
 };
 
 const HOOK_COMMANDS = {
+  thinking: 'claudeding play thinking',
+  'stop-thinking': 'claudeding stop-thinking',
   complete: 'claudeding play complete',
   feedback: 'claudeding play feedback',
   error: 'claudeding play error'
@@ -62,10 +66,10 @@ function addClaudedingHook(hookArray, command) {
 }
 
 export async function disable(event) {
-  const validEvents = ['complete', 'feedback', 'error'];
+  const validEvents = ['thinking', 'complete', 'feedback', 'error'];
 
   if (!validEvents.includes(event)) {
-    console.error(`Error: Invalid event "${event}". Use: complete, feedback, or error`);
+    console.error(`Error: Invalid event "${event}". Use: thinking, complete, feedback, or error`);
     process.exit(1);
   }
 
@@ -82,6 +86,18 @@ export async function disable(event) {
   if (settings.hooks[hookType].length === 0) {
     delete settings.hooks[hookType];
   }
+
+  // If disabling thinking, also disable stop-thinking (PreToolUse)
+  if (event === 'thinking') {
+    const stopHookType = EVENT_MAP['stop-thinking'];
+    if (settings.hooks?.[stopHookType]) {
+      settings.hooks[stopHookType] = removeClaudedingHook(settings.hooks[stopHookType]);
+      if (settings.hooks[stopHookType].length === 0) {
+        delete settings.hooks[stopHookType];
+      }
+    }
+  }
+
   if (Object.keys(settings.hooks).length === 0) {
     delete settings.hooks;
   }
@@ -91,10 +107,10 @@ export async function disable(event) {
 }
 
 export async function enable(event) {
-  const validEvents = ['complete', 'feedback', 'error'];
+  const validEvents = ['thinking', 'complete', 'feedback', 'error'];
 
   if (!validEvents.includes(event)) {
-    console.error(`Error: Invalid event "${event}". Use: complete, feedback, or error`);
+    console.error(`Error: Invalid event "${event}". Use: thinking, complete, feedback, or error`);
     process.exit(1);
   }
 
@@ -111,6 +127,14 @@ export async function enable(event) {
   }
 
   settings.hooks[hookType] = addClaudedingHook(settings.hooks[hookType], HOOK_COMMANDS[event]);
+
+  // If enabling thinking, also enable stop-thinking (PreToolUse) as failsafe
+  if (event === 'thinking') {
+    const stopHookType = EVENT_MAP['stop-thinking'];
+    if (!hasClaudedingHook(settings.hooks[stopHookType])) {
+      settings.hooks[stopHookType] = addClaudedingHook(settings.hooks[stopHookType], HOOK_COMMANDS['stop-thinking']);
+    }
+  }
 
   saveSettings(settings);
   console.log(`Enabled ${event} sound.`);

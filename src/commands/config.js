@@ -11,6 +11,7 @@ export default async function config() {
   console.log('Current settings:');
   console.log(JSON.stringify(currentConfig, null, 2));
   console.log('\nHooks installed:');
+  console.log(`  UserPromptSubmit (thinking): ${hooks.userPromptSubmit ? 'yes' : 'no'}`);
   console.log(`  Notification (feedback): ${hooks.notification ? 'yes' : 'no'}`);
   console.log(`  Stop (complete): ${hooks.stop ? 'yes' : 'no'}`);
   console.log(`  PostToolUseFailure (error): ${hooks.postToolUseFailure ? 'yes' : 'no'}`);

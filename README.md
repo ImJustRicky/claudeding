@@ -235,6 +235,30 @@ With `useProjectConfig: true`, you can create a `.claudeding.json` in any projec
 }
 ```
 
+## Playful Fun
+
+Optional silly features (off by default):
+
+### Jeopardy Thinking Music
+
+Play Jeopardy theme when Claude starts thinking:
+
+```bash
+claudeding enable thinking
+```
+
+Disable with `claudeding disable thinking`.
+
+### Fart Easter Egg
+
+1% chance of a random fart sound on any notification:
+
+```json
+{ "easterEggs": true }
+```
+
+Add to `~/.claudeding.json` to enable.
+
 ## Platform Support
 
 | Platform | Audio | Notifications |

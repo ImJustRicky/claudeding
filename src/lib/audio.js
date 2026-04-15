@@ -9,11 +9,13 @@ import { isSnoozing } from '../commands/snooze.js';
 import { isDndActive } from './dnd.js';
 
 const DEBOUNCE_FILE = join(homedir(), '.claudeding-lastplay');
+const THINKING_PID_FILE = join(homedir(), '.claudeding-thinking-pid');
 const DEBOUNCE_MS = 1500; // 1.5 seconds between sounds
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const AUDIO_DIR = join(__dirname, '..', 'audio');
 const LEGACY_SOUNDS_DIR = join(__dirname, '..', 'sounds');
+const FARTS_DIR = join(AUDIO_DIR, 'farts');
 
 // Check if current time is within quiet hours
 function isQuietHours() {
@@ -41,9 +43,9 @@ function isQuietHours() {
 
 // Get list of bundled sounds for each event type
 export function getBundledSounds() {
-  const result = { complete: [], feedback: [], error: [] };
+  const result = { complete: [], feedback: [], error: [], thinking: [] };
 
-  for (const event of ['complete', 'feedback', 'error']) {
+  for (const event of ['complete', 'feedback', 'error', 'thinking']) {
     const dir = join(AUDIO_DIR, event);
     if (!existsSync(dir)) continue;
 
@@ -67,7 +69,8 @@ export function getSelectedSounds() {
   return {
     complete: config.sounds?.complete || null,
     feedback: config.sounds?.feedback || null,
-    error: config.sounds?.error || null
+    error: config.sounds?.error || null,
+    thinking: config.sounds?.thinking || null
   };
 }
 
@@ -182,6 +185,24 @@ function shouldDebounce() {
   }
 }
 
+// Easter egg: 1% chance to play a random fart sound
+function getRandomFart() {
+  if (!existsSync(FARTS_DIR)) return null;
+
+  try {
+    const files = readdirSync(FARTS_DIR).filter(f =>
+      f.endsWith('.wav') || f.endsWith('.mp3')
+    );
+    if (files.length === 0) return null;
+
+    // Pick a random fart
+    const file = files[Math.floor(Math.random() * files.length)];
+    return join(FARTS_DIR, file);
+  } catch {
+    return null;
+  }
+}
+
 function markPlayed() {
   try {
     writeFileSync(DEBOUNCE_FILE, Date.now().toString());
@@ -190,48 +211,121 @@ function markPlayed() {
   }
 }
 
+// Stop any playing thinking music
+export function stopThinkingMusic() {
+  try {
+    if (!existsSync(THINKING_PID_FILE)) return;
+    const pid = parseInt(readFileSync(THINKING_PID_FILE, 'utf-8'), 10);
+    if (pid) {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        // Process might already be dead
+      }
+    }
+    // Clean up PID file
+    try {
+      const { unlinkSync } = require('fs');
+      unlinkSync(THINKING_PID_FILE);
+    } catch {}
+  } catch {
+    // Ignore errors
+  }
+}
+
+// Play thinking music in background (returns immediately)
+function playThinkingInBackground(filePath, volume) {
+  const os = platform();
+  let proc;
+
+  if (os === 'darwin') {
+    const vol = Math.max(0, Math.min(1, (volume ?? 100) / 100));
+    proc = spawn('afplay', ['-v', vol.toString(), filePath], {
+      detached: true,
+      stdio: 'ignore'
+    });
+  } else if (os === 'linux') {
+    const vol = Math.round((volume ?? 100) * 655.36);
+    proc = spawn('paplay', ['--volume', vol.toString(), filePath], {
+      detached: true,
+      stdio: 'ignore'
+    });
+  } else if (os === 'win32') {
+    const script = `(New-Object Media.SoundPlayer '${filePath.replace(/'/g, "''")}').PlaySync()`;
+    proc = spawn('powershell', ['-c', script], {
+      detached: true,
+      stdio: 'ignore'
+    });
+  }
+
+  if (proc?.pid) {
+    // Save PID so we can kill it later
+    writeFileSync(THINKING_PID_FILE, proc.pid.toString());
+    proc.unref();
+  }
+}
+
 export async function playSound(event, overrideName = null, options = {}) {
   const config = getEffectiveConfig(options.projectDir);
   const force = options.force === true;
 
+  // Stop thinking music when any other event fires (Claude is done thinking)
+  if (event !== 'thinking') {
+    stopThinkingMusic();
+  }
+
+  // Check for easter egg early (so we can skip focus check if it triggers)
+  let easterEggPath = null;
+  if (config.easterEggs && Math.random() < 0.01) {
+    easterEggPath = getRandomFart();
+  }
+
+  // Playful sounds always play (thinking, easter eggs) - ignore focus check
+  const isPlayfulSound = event === 'thinking' || easterEggPath;
+
   // Skip checks if force flag is set (for manual testing)
-  if (!force) {
+  if (!force && !isPlayfulSound) {
     // Skip sound if muted
     if (config.mute) {
-      return;
+      return { played: false, easterEgg: false };
     }
 
     // Skip sound if snoozing
     if (isSnoozing()) {
-      return;
+      return { played: false, easterEgg: false };
     }
 
     // Skip sound during quiet hours
     if (isQuietHours()) {
-      return;
+      return { played: false, easterEgg: false };
     }
 
     // Skip sound if system DND/Focus mode is on (if respectDnd is enabled)
     if (isDndActive()) {
-      return;
+      return { played: false, easterEgg: false };
     }
 
     // Skip sound if Claude Code / terminal is focused (user is already looking)
     if (config.skipWhenFocused !== false && isClaudeCodeFocused()) {
-      return;
+      return { played: false, easterEgg: false };
     }
 
     // Debounce: skip if sound played recently (prevents spam from multiple instances)
     if (shouldDebounce()) {
-      return;
+      return { played: false, easterEgg: false };
     }
   }
 
-  const soundPath = getSoundPath(event, overrideName);
+  let soundPath = getSoundPath(event, overrideName);
+
+  // Easter egg: use the pre-determined fart if triggered
+  if (easterEggPath) {
+    soundPath = easterEggPath;
+  }
 
   if (!soundPath || !existsSync(soundPath)) {
     console.warn(`Warning: Sound file not found for "${event}"`);
-    return;
+    return { played: false, easterEgg: false };
   }
 
   const os = platform();
@@ -241,6 +335,12 @@ export async function playSound(event, overrideName = null, options = {}) {
 
     const volume = config.volume ?? 100;
 
+    // Thinking music plays in background (so it can be stopped later)
+    if (event === 'thinking') {
+      playThinkingInBackground(soundPath, volume);
+      return { played: true, easterEgg: false };
+    }
+
     if (os === 'darwin') {
       await playMacOS(soundPath, volume);
     } else if (os === 'linux') {
@@ -249,8 +349,12 @@ export async function playSound(event, overrideName = null, options = {}) {
       await playWindows(soundPath, volume);
     } else {
       console.warn(`Warning: Unsupported platform: ${os}`);
+      return { played: false, easterEgg: !!easterEggPath };
     }
+
+    return { played: true, easterEgg: !!easterEggPath };
   } catch (err) {
     console.warn(`Warning: Failed to play sound: ${err.message}`);
+    return { played: false, easterEgg: !!easterEggPath };
   }
 }
