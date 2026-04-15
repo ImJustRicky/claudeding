@@ -8,11 +8,11 @@ Audio notifications for Claude Code. Hear a sound when Claude completes a task o
 
 ```bash
 # Install globally
-npm install -g claudeding
+npm install -g @byricky/claudeding
 claudeding setup
 
 # Or use npx
-npx claudeding setup
+npx @byricky/claudeding setup
 ```
 
 ## What it does

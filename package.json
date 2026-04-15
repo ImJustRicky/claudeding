@@ -1,5 +1,5 @@
 {
-  "name": "claudeding",
+  "name": "@byricky/claudeding",
   "version": "1.0.0",
   "description": "Audio notifications for Claude Code - hear when tasks complete or need input",
   "type": "module",
