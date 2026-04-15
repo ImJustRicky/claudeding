@@ -188,27 +188,31 @@ function markPlayed() {
   }
 }
 
-export async function playSound(event, overrideName = null) {
+export async function playSound(event, overrideName = null, options = {}) {
   const config = loadConfig();
+  const force = options.force === true;
 
-  // Skip sound if muted
-  if (config.mute) {
-    return;
-  }
+  // Skip checks if force flag is set (for manual testing)
+  if (!force) {
+    // Skip sound if muted
+    if (config.mute) {
+      return;
+    }
 
-  // Skip sound during quiet hours
-  if (isQuietHours()) {
-    return;
-  }
+    // Skip sound during quiet hours
+    if (isQuietHours()) {
+      return;
+    }
 
-  // Skip sound if Claude Code / terminal is focused (user is already looking)
-  if (config.skipWhenFocused !== false && isClaudeCodeFocused()) {
-    return;
-  }
+    // Skip sound if Claude Code / terminal is focused (user is already looking)
+    if (config.skipWhenFocused !== false && isClaudeCodeFocused()) {
+      return;
+    }
 
-  // Debounce: skip if sound played recently (prevents spam from multiple instances)
-  if (shouldDebounce()) {
-    return;
+    // Debounce: skip if sound played recently (prevents spam from multiple instances)
+    if (shouldDebounce()) {
+      return;
+    }
   }
 
   const soundPath = getSoundPath(event, overrideName);

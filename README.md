@@ -90,6 +90,26 @@ Plays a sound manually. Useful for testing.
 claudeding play complete
 claudeding play feedback
 claudeding play error
+
+# Bypass focus detection (plays even when terminal is focused)
+claudeding play complete --force
+```
+
+### `claudeding doctor`
+
+Run diagnostics to verify setup.
+
+```bash
+claudeding doctor
+```
+
+### `claudeding enable/disable <event>`
+
+Enable or disable specific event sounds.
+
+```bash
+claudeding disable error    # Stop playing error sounds
+claudeding enable error     # Re-enable error sounds
 ```
 
 ## Configuration

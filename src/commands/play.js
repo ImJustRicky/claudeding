@@ -79,7 +79,7 @@ function getProjectName(context) {
   return basename(cwd);
 }
 
-export default async function play(event) {
+export default async function play(event, options) {
   // Log all CLAUDE_ env vars for debugging
   const claudeEnvVars = Object.entries(process.env)
     .filter(([k]) => k.startsWith('CLAUDE'))
@@ -102,7 +102,7 @@ export default async function play(event) {
 
   // Play sound and show notification in parallel
   await Promise.all([
-    playSound(event),
+    playSound(event, null, { force: options?.force }),
     showNotification(event, projectName)
   ]);
 }

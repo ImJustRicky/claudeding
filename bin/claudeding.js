@@ -6,6 +6,8 @@ import play from '../src/commands/play.js';
 import config from '../src/commands/config.js';
 import sounds from '../src/commands/sounds.js';
 import mute from '../src/commands/mute.js';
+import doctor from '../src/commands/doctor.js';
+import { enable, disable } from '../src/commands/toggle.js';
 
 program
   .name('claudeding')
@@ -26,7 +28,8 @@ program
 
 program
   .command('play <event>')
-  .description('Play notification sound (complete or feedback)')
+  .description('Play notification sound (complete, feedback, or error)')
+  .option('-f, --force', 'Bypass focus detection and play sound immediately')
   .action(play);
 
 program
@@ -46,5 +49,20 @@ program
   .option('--off', 'Unmute sounds')
   .option('--toggle', 'Toggle mute state')
   .action(mute);
+
+program
+  .command('doctor')
+  .description('Run diagnostics to check configuration and dependencies')
+  .action(doctor);
+
+program
+  .command('enable <event>')
+  .description('Enable sound for event (complete, feedback, or error)')
+  .action(enable);
+
+program
+  .command('disable <event>')
+  .description('Disable sound for event (complete, feedback, or error)')
+  .action(disable);
 
 program.parse();
