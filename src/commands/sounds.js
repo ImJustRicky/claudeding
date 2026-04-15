@@ -13,9 +13,9 @@ export default async function sounds() {
   const bundled = getBundledSounds();
   const current = getSelectedSounds();
 
-  if (bundled.complete.length === 0 && bundled.feedback.length === 0) {
+  if (bundled.complete.length === 0 && bundled.feedback.length === 0 && bundled.error.length === 0) {
     console.log('No bundled sounds found in src/audio/');
-    console.log('Add WAV files to src/audio/complete/ and src/audio/feedback/');
+    console.log('Add WAV files to src/audio/complete/, src/audio/feedback/, and src/audio/error/');
     console.log('\nSee src/audio/README.md for instructions.');
     return;
   }
@@ -101,6 +101,49 @@ export default async function sounds() {
     } else {
       console.log('\nTo use a custom sound, edit ~/.claudeding.json');
       console.log('Set sounds.feedback to your file path.');
+    }
+  }
+
+  console.log('');
+
+  // Configure error sound
+  if (bundled.error.length > 0) {
+    console.log('--- Error Sound ---\n');
+
+    const errorChoice = await select({
+      message: 'Select sound for errors:',
+      choices: [
+        ...bundled.error.map(s => ({
+          name: s.name + (current.error === s.name ? ' (current)' : ''),
+          value: s.name,
+          description: s.file
+        })),
+        { name: 'Custom file...', value: '__custom__' }
+      ]
+    });
+
+    if (errorChoice !== '__custom__') {
+      const preview = await confirm({
+        message: 'Preview this sound?',
+        default: true
+      });
+
+      if (preview) {
+        await playSound('error', errorChoice);
+      }
+
+      const useIt = await confirm({
+        message: `Use "${errorChoice}" for errors?`,
+        default: true
+      });
+
+      if (useIt) {
+        setSelectedSound('error', errorChoice);
+        console.log(`\nSet error sound to: ${errorChoice}`);
+      }
+    } else {
+      console.log('\nTo use a custom sound, edit ~/.claudeding.json');
+      console.log('Set sounds.error to your file path.');
     }
   }
 

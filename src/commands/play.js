@@ -88,10 +88,10 @@ export default async function play(event) {
   debugLog(`CLAUDE env vars: ${claudeEnvVars || '(none)'}`);
   debugLog(`PWD: ${process.env.PWD}`);
 
-  const validEvents = ['complete', 'feedback'];
+  const validEvents = ['complete', 'feedback', 'error'];
 
   if (!validEvents.includes(event)) {
-    console.error(`Error: Invalid event "${event}". Use "complete" or "feedback".`);
+    console.error(`Error: Invalid event "${event}". Use "complete", "feedback", or "error".`);
     process.exit(1);
   }
 

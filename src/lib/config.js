@@ -7,12 +7,19 @@ const CONFIG_PATH = join(homedir(), '.claudeding.json');
 const DEFAULT_CONFIG = {
   sounds: {
     complete: null,
-    feedback: null
+    feedback: null,
+    error: null
   },
   notify: true,
   mute: false,
+  volume: 100,            // Volume 0-100
   skipWhenFocused: true,  // Don't play sounds when terminal/Claude Code is focused
-  afkTimeout: 30          // Seconds of idle time before considering user AFK (plays sound even if focused)
+  afkTimeout: 30,         // Seconds of idle time before considering user AFK (plays sound even if focused)
+  quietHours: {
+    enabled: false,
+    start: '22:00',       // 24-hour format
+    end: '08:00'
+  }
 };
 
 export function getConfigPath() {

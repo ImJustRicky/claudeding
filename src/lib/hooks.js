@@ -28,6 +28,17 @@ const CLAUDEDING_HOOKS = {
         }
       ]
     }
+  ],
+  PostToolUseFailure: [
+    {
+      matcher: '',
+      hooks: [
+        {
+          type: 'command',
+          command: 'claudeding play error'
+        }
+      ]
+    }
   ]
 };
 
@@ -99,6 +110,14 @@ export function installHooks() {
     ];
   }
 
+  // Add PostToolUseFailure hooks if not already present
+  if (!hasClaudedingHook(settings.hooks.PostToolUseFailure)) {
+    settings.hooks.PostToolUseFailure = [
+      ...(settings.hooks.PostToolUseFailure || []),
+      ...CLAUDEDING_HOOKS.PostToolUseFailure
+    ];
+  }
+
   saveSettings(settings);
 
   return { settingsPath: SETTINGS_PATH, backedUp: hadBackup, backupPath: BACKUP_PATH };
@@ -123,12 +142,20 @@ export function uninstallHooks() {
     removed = true;
   }
 
+  if (hasClaudedingHook(settings.hooks.PostToolUseFailure)) {
+    settings.hooks.PostToolUseFailure = removeClaudedingHooks(settings.hooks.PostToolUseFailure);
+    removed = true;
+  }
+
   // Clean up empty arrays
   if (settings.hooks.Notification?.length === 0) {
     delete settings.hooks.Notification;
   }
   if (settings.hooks.Stop?.length === 0) {
     delete settings.hooks.Stop;
+  }
+  if (settings.hooks.PostToolUseFailure?.length === 0) {
+    delete settings.hooks.PostToolUseFailure;
   }
   if (Object.keys(settings.hooks).length === 0) {
     delete settings.hooks;
@@ -143,6 +170,7 @@ export function checkHooksInstalled() {
   const settings = loadSettings();
   return {
     notification: hasClaudedingHook(settings.hooks?.Notification),
-    stop: hasClaudedingHook(settings.hooks?.Stop)
+    stop: hasClaudedingHook(settings.hooks?.Stop),
+    postToolUseFailure: hasClaudedingHook(settings.hooks?.PostToolUseFailure)
   };
 }

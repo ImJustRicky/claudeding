@@ -89,7 +89,8 @@ export default async function setup(options) {
   console.log(`Config file:\n  ${getConfigPath()}\n`);
   console.log('Done! You will now hear notifications when Claude Code:');
   console.log('  - Completes a task (ding!)');
-  console.log('  - Needs your input (different ding!)\n');
-  console.log('Run "claudeding play complete" or "claudeding play feedback" to test.');
+  console.log('  - Needs your input (different ding!)');
+  console.log('  - Encounters an error (alert sound!)\n');
+  console.log('Run "claudeding play complete", "claudeding play feedback", or "claudeding play error" to test.');
   console.log('Say "mute" to Claude and it will know to run "claudeding mute".');
 }

@@ -61,6 +61,19 @@ const FEEDBACK_MESSAGES = [
   '⚠️ Waiting for input!'
 ];
 
+const ERROR_MESSAGES = [
+  '❌ Something went wrong!',
+  '🚨 Error occurred!',
+  '⚠️ Oops, hit a snag!',
+  '🔴 Tool failed!',
+  '😅 That didn\'t work!',
+  '🛑 Error alert!',
+  '💥 Something broke!',
+  '🤕 Hit an error!',
+  '📛 Failure detected!',
+  '🔧 Needs fixing!'
+];
+
 function getRandomMessage(messages) {
   return messages[Math.floor(Math.random() * messages.length)];
 }
@@ -159,9 +172,14 @@ export async function showNotification(event, projectName) {
   markNotified();
 
   const title = 'claudeding';
-  const eventMessage = event === 'complete'
-    ? getRandomMessage(COMPLETE_MESSAGES)
-    : getRandomMessage(FEEDBACK_MESSAGES);
+  let eventMessage;
+  if (event === 'complete') {
+    eventMessage = getRandomMessage(COMPLETE_MESSAGES);
+  } else if (event === 'error') {
+    eventMessage = getRandomMessage(ERROR_MESSAGES);
+  } else {
+    eventMessage = getRandomMessage(FEEDBACK_MESSAGES);
+  }
   const message = projectName ? `${projectName} — ${eventMessage}` : eventMessage;
 
   const os = platform();

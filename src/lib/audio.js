@@ -13,11 +13,35 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const AUDIO_DIR = join(__dirname, '..', 'audio');
 const LEGACY_SOUNDS_DIR = join(__dirname, '..', 'sounds');
 
+// Check if current time is within quiet hours
+function isQuietHours() {
+  const config = loadConfig();
+  const qh = config.quietHours;
+
+  if (!qh?.enabled) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const [startH, startM] = (qh.start || '22:00').split(':').map(Number);
+  const [endH, endM] = (qh.end || '08:00').split(':').map(Number);
+
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  // Handle overnight quiet hours (e.g., 22:00 - 08:00)
+  if (startMinutes > endMinutes) {
+    return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+  }
+
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+}
+
 // Get list of bundled sounds for each event type
 export function getBundledSounds() {
-  const result = { complete: [], feedback: [] };
+  const result = { complete: [], feedback: [], error: [] };
 
-  for (const event of ['complete', 'feedback']) {
+  for (const event of ['complete', 'feedback', 'error']) {
     const dir = join(AUDIO_DIR, event);
     if (!existsSync(dir)) continue;
 
@@ -40,7 +64,8 @@ export function getSelectedSounds() {
   const config = loadConfig();
   return {
     complete: config.sounds?.complete || null,
-    feedback: config.sounds?.feedback || null
+    feedback: config.sounds?.feedback || null,
+    error: config.sounds?.error || null
   };
 }
 
@@ -88,9 +113,11 @@ function getSoundPath(event, overrideName = null) {
   return null;
 }
 
-function playMacOS(filePath) {
+function playMacOS(filePath, volume) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('afplay', [filePath]);
+    // afplay volume is 0-1, config is 0-100
+    const vol = Math.max(0, Math.min(1, (volume ?? 100) / 100));
+    const proc = spawn('afplay', ['-v', vol.toString(), filePath]);
     proc.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`afplay exited with code ${code}`));
@@ -99,14 +126,17 @@ function playMacOS(filePath) {
   });
 }
 
-function playLinux(filePath) {
+function playLinux(filePath, volume) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('paplay', [filePath]);
+    // paplay uses 0-65536, we'll scale from 0-100
+    const vol = Math.round((volume ?? 100) * 655.36);
+    const proc = spawn('paplay', ['--volume', vol.toString(), filePath]);
 
     proc.on('close', (code) => {
       if (code === 0) {
         resolve();
       } else {
+        // aplay doesn't support volume, fall back without it
         const fallback = spawn('aplay', [filePath]);
         fallback.on('close', (fallbackCode) => {
           if (fallbackCode === 0) resolve();
@@ -127,8 +157,9 @@ function playLinux(filePath) {
   });
 }
 
-function playWindows(filePath) {
+function playWindows(filePath, volume) {
   return new Promise((resolve, reject) => {
+    // Windows SoundPlayer doesn't support volume directly, use system volume
     const script = `(New-Object Media.SoundPlayer '${filePath.replace(/'/g, "''")}').PlaySync()`;
     const proc = spawn('powershell', ['-c', script]);
     proc.on('close', (code) => {
@@ -165,6 +196,11 @@ export async function playSound(event, overrideName = null) {
     return;
   }
 
+  // Skip sound during quiet hours
+  if (isQuietHours()) {
+    return;
+  }
+
   // Skip sound if Claude Code / terminal is focused (user is already looking)
   if (config.skipWhenFocused !== false && isClaudeCodeFocused()) {
     return;
@@ -187,12 +223,14 @@ export async function playSound(event, overrideName = null) {
   try {
     markPlayed(); // Mark before playing to prevent race conditions
 
+    const volume = config.volume ?? 100;
+
     if (os === 'darwin') {
-      await playMacOS(soundPath);
+      await playMacOS(soundPath, volume);
     } else if (os === 'linux') {
-      await playLinux(soundPath);
+      await playLinux(soundPath, volume);
     } else if (os === 'win32') {
-      await playWindows(soundPath);
+      await playWindows(soundPath, volume);
     } else {
       console.warn(`Warning: Unsupported platform: ${os}`);
     }

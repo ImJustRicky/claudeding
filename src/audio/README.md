@@ -6,6 +6,7 @@ This folder contains the bundled sound effects for claudeding.
 
 - `complete/` - Sounds for task completion
 - `feedback/` - Sounds for when Claude needs input
+- `error/` - Sounds for tool failures/errors
 
 ## Adding Sounds
 

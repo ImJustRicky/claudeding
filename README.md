@@ -20,6 +20,7 @@ npx @byricky/claudeding setup
 Once set up, you'll hear:
 - A **completion sound** when Claude finishes a task
 - A **feedback sound** when Claude is waiting for your input
+- An **error sound** when a tool fails
 
 You'll also see a system notification showing which project triggered it.
 
@@ -29,6 +30,8 @@ You'll also see a system notification showing which project triggered it.
 - **AFK detection**: Plays sound if you've been idle 30+ seconds, even if terminal is focused
 - **Debouncing**: Multiple Claude instances won't spam you with sounds
 - **Random messages**: Fun notifications with emojis like "🎉 All done!" and "👋 Need your input!"
+- **Volume control**: Adjust notification volume (0-100)
+- **Quiet hours**: Automatically mute sounds during specified hours
 
 Setup also adds instructions to your `~/.claude/CLAUDE.md` so Claude knows how to control notifications when you ask (e.g., "mute the dings").
 
@@ -86,6 +89,7 @@ Plays a sound manually. Useful for testing.
 ```bash
 claudeding play complete
 claudeding play feedback
+claudeding play error
 ```
 
 ## Configuration
@@ -96,12 +100,19 @@ Config is stored at `~/.claudeding.json`:
 {
   "sounds": {
     "complete": null,
-    "feedback": null
+    "feedback": null,
+    "error": null
   },
   "notify": true,
   "mute": false,
+  "volume": 100,
   "skipWhenFocused": true,
-  "afkTimeout": 30
+  "afkTimeout": 30,
+  "quietHours": {
+    "enabled": false,
+    "start": "22:00",
+    "end": "08:00"
+  }
 }
 ```
 
@@ -109,10 +120,15 @@ Config is stored at `~/.claudeding.json`:
 |--------|-------------|
 | `sounds.complete` | Name of bundled sound or path to custom WAV/MP3. `null` = default |
 | `sounds.feedback` | Name of bundled sound or path to custom WAV/MP3. `null` = default |
+| `sounds.error` | Name of bundled sound or path to custom WAV/MP3. `null` = default |
 | `notify` | Show system notifications (`true`/`false`) |
 | `mute` | Mute all sounds (`true`/`false`) |
+| `volume` | Volume level 0-100 (default: 100) |
 | `skipWhenFocused` | Skip sounds when terminal is focused (`true`/`false`) |
 | `afkTimeout` | Seconds of idle time before playing sound even when focused. Set to `0` to disable AFK detection |
+| `quietHours.enabled` | Enable quiet hours (`true`/`false`) |
+| `quietHours.start` | Start time in 24-hour format (e.g., `"22:00"`) |
+| `quietHours.end` | End time in 24-hour format (e.g., `"08:00"`) |
 
 ## Platform Support
 
@@ -138,6 +154,7 @@ claudeding adds hooks to your Claude Code settings (`~/.claude/settings.json`):
 
 - **Notification** hook → plays feedback sound when Claude needs input
 - **Stop** hook → plays completion sound when Claude finishes
+- **PostToolUseFailure** hook → plays error sound when a tool fails
 
 Your existing hooks are preserved. A backup is created at `~/.claude/settings.json.claudeding-backup` before any modifications.
 
