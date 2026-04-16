@@ -3,6 +3,7 @@ import { platform, homedir } from 'os';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { loadConfig } from './config.js';
+import { sendWebhooks } from './webhook.js';
 
 const DEBOUNCE_FILE = join(homedir(), '.claudeding-lastnotify');
 const DEBOUNCE_MS = 1500; // 1.5 seconds between notifications
@@ -78,6 +79,19 @@ function getRandomMessage(messages) {
   return messages[Math.floor(Math.random() * messages.length)];
 }
 
+function getEventMessage(event, config) {
+  // Check for custom messages first
+  const customMessages = config.customMessages?.[event];
+  if (customMessages && customMessages.length > 0) {
+    return getRandomMessage(customMessages);
+  }
+
+  // Fall back to defaults
+  if (event === 'complete') return getRandomMessage(COMPLETE_MESSAGES);
+  if (event === 'error') return getRandomMessage(ERROR_MESSAGES);
+  return getRandomMessage(FEEDBACK_MESSAGES);
+}
+
 function getTerminalBundleId() {
   const termProgram = process.env.TERM_PROGRAM?.toLowerCase() || '';
 
@@ -107,10 +121,12 @@ function notifyMacOS(title, message) {
     const bundleId = getTerminalBundleId();
 
     // Try terminal-notifier first (better branding), fall back to osascript
+    // Using -group to replace previous claudeding notifications (prevents flooding)
     const tn = spawn('terminal-notifier', [
       '-title', title,
       '-message', message,
       '-sender', bundleId,
+      '-group', 'claudeding',
       '-ignoreDnD'
     ]);
 
@@ -172,18 +188,12 @@ export async function showNotification(event, projectName) {
   markNotified();
 
   const title = 'claudeding';
-  let eventMessage;
-  if (event === 'complete') {
-    eventMessage = getRandomMessage(COMPLETE_MESSAGES);
-  } else if (event === 'error') {
-    eventMessage = getRandomMessage(ERROR_MESSAGES);
-  } else {
-    eventMessage = getRandomMessage(FEEDBACK_MESSAGES);
-  }
+  const eventMessage = getEventMessage(event, config);
   const message = projectName ? `${projectName} — ${eventMessage}` : eventMessage;
 
   const os = platform();
 
+  // Send desktop notification
   try {
     if (os === 'darwin') {
       await notifyMacOS(title, message);
@@ -195,4 +205,7 @@ export async function showNotification(event, projectName) {
   } catch {
     // Silently fail - notifications are nice to have
   }
+
+  // Send webhooks (async, don't wait)
+  sendWebhooks(event, projectName, eventMessage).catch(() => {});
 }

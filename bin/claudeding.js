@@ -12,12 +12,13 @@ import { enable, disable } from '../src/commands/toggle.js';
 import snooze from '../src/commands/snooze.js';
 import tray from '../src/commands/tray.js';
 import stats from '../src/commands/stats.js';
+import status from '../src/commands/status.js';
 import stopThinkingCmd from '../src/commands/stopThinking.js';
 
 program
   .name('claudeding')
   .description('Audio notifications for Claude Code')
-  .version('1.0.12')
+  .version('1.0.16')
   .addHelpText('after', `
 Examples:
   $ claudeding setup          # First-time setup
@@ -48,6 +49,11 @@ program
   .command('doctor')
   .description('Check if everything is working')
   .action(doctor);
+
+program
+  .command('status')
+  .description('Quick overview of current state')
+  .action(status);
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 

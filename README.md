@@ -30,12 +30,14 @@ You'll also see a system notification showing which project triggered it.
 - **AFK detection**: Plays sound if you've been idle 30+ seconds, even if terminal is focused
 - **Debouncing**: Multiple Claude instances won't spam you with sounds
 - **Random messages**: Fun notifications with emojis like "🎉 All done!" and "👋 Need your input!"
+- **Custom messages**: Set your own notification text
 - **Volume control**: Adjust notification volume (0-100)
 - **Quiet hours**: Automatically mute sounds during specified hours
 - **Snooze**: Temporarily pause sounds (`claudeding snooze 30m`)
 - **Menu bar widget**: Quick controls from your menu bar (macOS)
 - **Per-project sounds**: Different sounds for different projects
 - **System DND respect**: Optional integration with macOS Focus mode
+- **Webhooks**: Send notifications to Slack or Discord
 - **Usage stats**: Track your Claude usage patterns (opt-in)
 
 Setup also adds instructions to your `~/.claude/CLAUDE.md` so Claude knows how to control notifications when you ask (e.g., "mute the dings").
@@ -60,6 +62,52 @@ Removes claudeding hooks and instructions from Claude Code.
 ```bash
 claudeding uninstall
 ```
+
+### `claudeding status`
+
+Quick overview of current state.
+
+```bash
+claudeding status
+```
+
+Example output:
+
+```
+  claudeding status
+
+  State: 🔔 Active
+  Volume: 100%
+
+  Hooks:
+    Complete (Stop):        ✓
+    Feedback (Notification): ✓
+    Error (ToolFailure):     ✓
+    Thinking (UserPrompt):   ✗
+
+  Features:
+    Skip when focused: on
+    AFK override:      30s
+    Quiet hours:       off
+    Webhooks:          2 configured
+```
+
+### `claudeding settings`
+
+Interactive settings menu with all configuration options.
+
+```bash
+claudeding settings
+```
+
+Features:
+- Volume control with test
+- Sound picker
+- Preview all sounds
+- Toggle focus detection, AFK, quiet hours, DND
+- Configure webhooks (Slack/Discord)
+- Set custom notification messages
+- Enable/disable easter eggs
 
 ### `claudeding mute`
 
@@ -201,6 +249,12 @@ Config is stored at `~/.claudeding.json`:
     "enabled": false,
     "start": "22:00",
     "end": "08:00"
+  },
+  "webhooks": [],
+  "customMessages": {
+    "complete": ["Done!", "All set!"],
+    "feedback": ["Your turn!"],
+    "error": ["Oops!"]
   }
 }
 ```
@@ -221,6 +275,10 @@ Config is stored at `~/.claudeding.json`:
 | `quietHours.enabled` | Enable quiet hours (`true`/`false`) |
 | `quietHours.start` | Start time in 24-hour format (e.g., `"22:00"`) |
 | `quietHours.end` | End time in 24-hour format (e.g., `"08:00"`) |
+| `webhooks` | Array of webhook URLs (Slack/Discord auto-detected) |
+| `customMessages.complete` | Array of custom completion messages |
+| `customMessages.feedback` | Array of custom feedback messages |
+| `customMessages.error` | Array of custom error messages |
 
 ### Per-Project Config
 
@@ -234,6 +292,32 @@ With `useProjectConfig: true`, you can create a `.claudeding.json` in any projec
   "volume": 50
 }
 ```
+
+## Webhooks
+
+Send notifications to Slack or Discord when Claude completes tasks or needs input.
+
+### Setup via Settings
+
+```bash
+claudeding settings
+# → Webhooks → Add webhook → paste URL
+```
+
+### Setup via Config
+
+Add webhook URLs to `~/.claudeding.json`:
+
+```json
+{
+  "webhooks": [
+    "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+    "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK"
+  ]
+}
+```
+
+Webhook type (Slack/Discord) is auto-detected from the URL. Messages are formatted appropriately for each platform with emoji indicators and project names.
 
 ## Playful Fun
 

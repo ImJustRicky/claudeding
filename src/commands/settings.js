@@ -11,15 +11,20 @@ export default async function settings() {
     const hooks = checkHooksInstalled();
     const thinkingEnabled = hooks.userPromptSubmit;
 
+    const webhookCount = config.webhooks?.length || 0;
+
     const choice = await p.select({
       message: 'What would you like to configure?',
       options: [
         { value: 'volume', label: `Volume: ${config.volume ?? 100}%`, hint: 'How loud notifications play' },
         { value: 'sounds', label: 'Pick sounds', hint: 'Choose different notification sounds' },
+        { value: 'preview', label: 'Preview sounds', hint: 'Test all notification sounds' },
         { value: 'focus', label: `Skip when focused: ${config.skipWhenFocused !== false ? 'on' : 'off'}`, hint: 'No sound if terminal is visible' },
         { value: 'afk', label: `AFK override: ${config.afkTimeout > 0 ? config.afkTimeout + 's' : 'off'}`, hint: 'Play anyway if idle this long' },
         { value: 'quietHours', label: `Quiet hours: ${config.quietHours?.enabled ? config.quietHours.start + '-' + config.quietHours.end : 'off'}`, hint: 'Auto-mute during set hours' },
         { value: 'dnd', label: `Respect system DND: ${config.respectDnd ? 'on' : 'off'}`, hint: 'Mute when macOS Focus is on' },
+        { value: 'webhooks', label: `Webhooks: ${webhookCount > 0 ? webhookCount + ' configured' : 'none'}`, hint: 'Slack/Discord notifications' },
+        { value: 'messages', label: 'Custom messages', hint: 'Set your own notification text' },
         { value: 'thinking', label: `Jeopardy thinking music: ${thinkingEnabled ? 'on' : 'off'}`, hint: 'Play music while Claude thinks' },
         { value: 'easterEggs', label: `Fart easter eggs: ${config.easterEggs ? 'on' : 'off'}`, hint: '1% chance of a fart sound' },
         { value: 'stats', label: `Usage stats: ${config.logStats ? 'on' : 'off'}`, hint: 'Log events for statistics' },
@@ -126,6 +131,102 @@ export default async function settings() {
         const newStats = !config.logStats;
         updateConfig({ logStats: newStats });
         p.log.success(`Usage stats: ${newStats ? 'on' : 'off'}`);
+        break;
+
+      case 'preview':
+        p.log.info('Playing all sounds...');
+        p.log.step('Complete sound:');
+        await playSound('complete', null, { force: true });
+        await new Promise(r => setTimeout(r, 1500));
+        p.log.step('Feedback sound:');
+        await playSound('feedback', null, { force: true });
+        await new Promise(r => setTimeout(r, 1500));
+        p.log.step('Error sound:');
+        await playSound('error', null, { force: true });
+        p.log.success('Done!');
+        break;
+
+      case 'webhooks':
+        const webhooks = config.webhooks || [];
+        const webhookAction = await p.select({
+          message: 'Webhook settings',
+          options: [
+            { value: 'add', label: 'Add webhook', hint: 'Slack or Discord URL' },
+            { value: 'list', label: 'List webhooks', hint: `${webhooks.length} configured` },
+            { value: 'clear', label: 'Clear all webhooks' },
+            { value: 'back', label: 'Back' }
+          ]
+        });
+
+        if (p.isCancel(webhookAction) || webhookAction === 'back') break;
+
+        if (webhookAction === 'add') {
+          const url = await p.text({
+            message: 'Webhook URL:',
+            placeholder: 'https://hooks.slack.com/... or https://discord.com/api/webhooks/...',
+            validate: (v) => {
+              if (!v.startsWith('http')) return 'Must be a URL';
+            }
+          });
+          if (!p.isCancel(url)) {
+            updateConfig({ webhooks: [...webhooks, url] });
+            p.log.success('Webhook added!');
+          }
+        } else if (webhookAction === 'list') {
+          if (webhooks.length === 0) {
+            p.log.info('No webhooks configured');
+          } else {
+            webhooks.forEach((w, i) => {
+              const url = typeof w === 'string' ? w : w.url;
+              const type = url.includes('slack') ? 'Slack' : url.includes('discord') ? 'Discord' : 'Generic';
+              p.log.info(`${i + 1}. [${type}] ${url.substring(0, 50)}...`);
+            });
+          }
+        } else if (webhookAction === 'clear') {
+          const confirm = await p.confirm({ message: 'Remove all webhooks?' });
+          if (confirm && !p.isCancel(confirm)) {
+            updateConfig({ webhooks: [] });
+            p.log.success('All webhooks removed');
+          }
+        }
+        break;
+
+      case 'messages':
+        const msgEvent = await p.select({
+          message: 'Which event to customize?',
+          options: [
+            { value: 'complete', label: 'Complete messages' },
+            { value: 'feedback', label: 'Feedback messages' },
+            { value: 'error', label: 'Error messages' },
+            { value: 'reset', label: 'Reset to defaults' },
+            { value: 'back', label: 'Back' }
+          ]
+        });
+
+        if (p.isCancel(msgEvent) || msgEvent === 'back') break;
+
+        if (msgEvent === 'reset') {
+          updateConfig({ customMessages: null });
+          p.log.success('Reset to default messages');
+          break;
+        }
+
+        const currentMsgs = config.customMessages?.[msgEvent] || [];
+        p.log.info(`Current: ${currentMsgs.length > 0 ? currentMsgs.join(', ') : 'using defaults'}`);
+
+        const newMsg = await p.text({
+          message: 'Enter custom messages (comma-separated):',
+          placeholder: 'Done!, All set!, Finished!',
+          initialValue: currentMsgs.join(', ')
+        });
+
+        if (!p.isCancel(newMsg) && newMsg.trim()) {
+          const messages = newMsg.split(',').map(m => m.trim()).filter(Boolean);
+          const customMessages = config.customMessages || {};
+          customMessages[msgEvent] = messages;
+          updateConfig({ customMessages });
+          p.log.success(`Set ${messages.length} custom messages for ${msgEvent}`);
+        }
         break;
     }
   }
