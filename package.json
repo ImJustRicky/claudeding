@@ -1,6 +1,6 @@
 {
   "name": "@byricky/claudeding",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Audio notifications for Claude Code - hear when tasks complete or need input",
   "type": "module",
   "bin": {

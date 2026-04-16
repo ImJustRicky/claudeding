@@ -5,6 +5,7 @@ import uninstall from '../src/commands/uninstall.js';
 import play from '../src/commands/play.js';
 import config from '../src/commands/config.js';
 import sounds from '../src/commands/sounds.js';
+import settings from '../src/commands/settings.js';
 import mute from '../src/commands/mute.js';
 import doctor from '../src/commands/doctor.js';
 import { enable, disable } from '../src/commands/toggle.js';
@@ -16,80 +17,105 @@ import stopThinkingCmd from '../src/commands/stopThinking.js';
 program
   .name('claudeding')
   .description('Audio notifications for Claude Code')
-  .version('1.0.0');
+  .version('1.0.12')
+  .addHelpText('after', `
+Examples:
+  $ claudeding setup          # First-time setup
+  $ claudeding settings       # Interactive settings menu
+  $ claudeding sounds         # Change notification sounds
+  $ claudeding mute --on      # Mute sounds
+  $ claudeding snooze 30m     # Pause for 30 minutes
+  $ claudeding enable farts   # Enable easter eggs
+
+More info: https://github.com/ImJustRicky/claudeding
+`);
+
+// ─── Setup & Diagnostics ─────────────────────────────────────────────────────
 
 program
   .command('setup')
-  .description('Install Claude Code hooks for audio notifications')
-  .option('--complete-sound <path>', 'Custom sound file for task completion')
-  .option('--feedback-sound <path>', 'Custom sound file for feedback needed')
+  .description('Install hooks (run this first!)')
+  .option('--complete-sound <path>', 'Custom sound for task completion')
+  .option('--feedback-sound <path>', 'Custom sound for feedback needed')
   .action(setup);
 
 program
   .command('uninstall')
-  .description('Remove claudeding hooks from Claude Code')
+  .description('Remove all claudeding hooks')
   .action(uninstall);
 
 program
-  .command('play <event>')
-  .description('Play notification sound (complete, feedback, or error)')
-  .option('-f, --force', 'Bypass focus detection and play sound immediately')
-  .action(play);
+  .command('doctor')
+  .description('Check if everything is working')
+  .action(doctor);
+
+// ─── Configuration ───────────────────────────────────────────────────────────
 
 program
-  .command('config')
-  .description('Show current configuration')
-  .action(config);
+  .command('settings')
+  .description('Interactive settings menu')
+  .action(settings);
 
 program
   .command('sounds')
-  .description('Configure notification sounds (interactive)')
+  .description('Pick notification sounds')
   .action(sounds);
 
 program
+  .command('config')
+  .description('Show current config (read-only)')
+  .action(config);
+
+// ─── Quick Controls ──────────────────────────────────────────────────────────
+
+program
   .command('mute')
-  .description('Toggle sound mute (notifications still show)')
-  .option('--on', 'Mute sounds')
-  .option('--off', 'Unmute sounds')
-  .option('--toggle', 'Toggle mute state')
+  .description('Mute/unmute sounds')
+  .option('--on', 'Mute')
+  .option('--off', 'Unmute')
   .action(mute);
 
 program
-  .command('doctor')
-  .description('Run diagnostics to check configuration and dependencies')
-  .action(doctor);
-
-program
-  .command('enable <event>')
-  .description('Enable sound for event (complete, feedback, error, thinking, farts)')
-  .action(enable);
-
-program
-  .command('disable <event>')
-  .description('Disable sound for event (complete, feedback, error, thinking, farts)')
-  .action(disable);
-
-program
   .command('snooze [duration]')
-  .description('Pause sounds temporarily (e.g., 30m, 2h)')
+  .description('Pause sounds (e.g., 30m, 2h)')
   .option('--off', 'Cancel snooze')
   .action(snooze);
 
 program
+  .command('enable <feature>')
+  .description('Enable: complete, feedback, error, thinking, farts')
+  .action(enable);
+
+program
+  .command('disable <feature>')
+  .description('Disable: complete, feedback, error, thinking, farts')
+  .action(disable);
+
+// ─── Extras ──────────────────────────────────────────────────────────────────
+
+program
   .command('tray')
-  .description('Start menu bar widget (macOS only)')
+  .description('Menu bar widget (macOS)')
   .action(tray);
 
 program
   .command('stats')
-  .description('View usage statistics (off by default)')
-  .option('--on', 'Enable stats logging')
-  .option('--off', 'Disable stats logging')
+  .description('Usage statistics')
+  .option('--on', 'Enable logging')
+  .option('--off', 'Disable logging')
   .action(stats);
 
 program
-  .command('stop-thinking')
-  .description('Stop thinking music (used internally by hooks)')
+  .command('play <event>')
+  .description('Test a sound: complete, feedback, error, thinking')
+  .option('-f, --force', 'Bypass focus detection')
+  .action(play);
+
+// ─── Internal (hidden) ───────────────────────────────────────────────────────
+
+program
+  .command('stop-thinking', { hidden: true })
+  .description('Stop thinking music (internal)')
   .action(stopThinkingCmd);
 
 program.parse();

@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { platform, homedir } from 'os';
 import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
@@ -225,7 +225,6 @@ export function stopThinkingMusic() {
     }
     // Clean up PID file
     try {
-      const { unlinkSync } = require('fs');
       unlinkSync(THINKING_PID_FILE);
     } catch {}
   } catch {
