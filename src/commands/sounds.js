@@ -1,151 +1,73 @@
-import { select, confirm } from '@inquirer/prompts';
-import { readdirSync, existsSync } from 'fs';
-import { join, basename, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import * as p from '@clack/prompts';
 import { playSound, getBundledSounds, setSelectedSound, getSelectedSounds } from '../lib/audio.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const AUDIO_DIR = join(__dirname, '..', 'audio');
-
 export default async function sounds() {
-  console.log('claudeding Sound Configuration\n');
-
   const bundled = getBundledSounds();
   const current = getSelectedSounds();
 
   if (bundled.complete.length === 0 && bundled.feedback.length === 0 && bundled.error.length === 0) {
-    console.log('No bundled sounds found in src/audio/');
-    console.log('Add WAV files to src/audio/complete/, src/audio/feedback/, and src/audio/error/');
-    console.log('\nSee src/audio/README.md for instructions.');
+    p.log.warn('No bundled sounds found');
     return;
   }
 
-  // Configure complete sound
-  if (bundled.complete.length > 0) {
-    console.log('--- Task Complete Sound ---\n');
-
-    const completeChoice = await select({
-      message: 'Select sound for task completion:',
-      choices: [
-        ...bundled.complete.map(s => ({
-          name: s.name + (current.complete === s.name ? ' (current)' : ''),
-          value: s.name,
-          description: s.file
-        })),
-        { name: 'Custom file...', value: '__custom__' }
+  while (true) {
+    const eventType = await p.select({
+      message: 'Which sound to configure?',
+      options: [
+        { value: 'complete', label: 'Task complete', hint: current.complete || 'default' },
+        { value: 'feedback', label: 'Needs input', hint: current.feedback || 'default' },
+        { value: 'error', label: 'Error', hint: current.error || 'default' },
+        { value: 'back', label: 'Back' }
       ]
     });
 
-    if (completeChoice !== '__custom__') {
-      const preview = await confirm({
-        message: 'Preview this sound?',
-        default: true
-      });
-
-      if (preview) {
-        await playSound('complete', completeChoice);
-      }
-
-      const useIt = await confirm({
-        message: `Use "${completeChoice}" for task completion?`,
-        default: true
-      });
-
-      if (useIt) {
-        setSelectedSound('complete', completeChoice);
-        console.log(`\nSet complete sound to: ${completeChoice}`);
-      }
-    } else {
-      console.log('\nTo use a custom sound, edit ~/.claudeding.json');
-      console.log('Set sounds.complete to your file path.');
+    if (p.isCancel(eventType) || eventType === 'back') {
+      return;
     }
-  }
 
-  console.log('');
+    const sounds = bundled[eventType];
+    if (!sounds || sounds.length === 0) {
+      p.log.warn(`No sounds for ${eventType}`);
+      continue;
+    }
 
-  // Configure feedback sound
-  if (bundled.feedback.length > 0) {
-    console.log('--- Waiting for Input Sound ---\n');
+    const options = [
+      ...sounds.map(s => ({
+        value: s.name,
+        label: s.name,
+        hint: current[eventType] === s.name ? 'current' : undefined
+      })),
+      { value: 'back', label: 'Back' }
+    ];
 
-    const feedbackChoice = await select({
-      message: 'Select sound for feedback needed:',
-      choices: [
-        ...bundled.feedback.map(s => ({
-          name: s.name + (current.feedback === s.name ? ' (current)' : ''),
-          value: s.name,
-          description: s.file
-        })),
-        { name: 'Custom file...', value: '__custom__' }
-      ]
+    const soundChoice = await p.select({
+      message: `Pick ${eventType} sound:`,
+      options
     });
 
-    if (feedbackChoice !== '__custom__') {
-      const preview = await confirm({
-        message: 'Preview this sound?',
-        default: true
-      });
-
-      if (preview) {
-        await playSound('feedback', feedbackChoice);
-      }
-
-      const useIt = await confirm({
-        message: `Use "${feedbackChoice}" for feedback?`,
-        default: true
-      });
-
-      if (useIt) {
-        setSelectedSound('feedback', feedbackChoice);
-        console.log(`\nSet feedback sound to: ${feedbackChoice}`);
-      }
-    } else {
-      console.log('\nTo use a custom sound, edit ~/.claudeding.json');
-      console.log('Set sounds.feedback to your file path.');
+    if (p.isCancel(soundChoice) || soundChoice === 'back') {
+      continue;
     }
-  }
 
-  console.log('');
-
-  // Configure error sound
-  if (bundled.error.length > 0) {
-    console.log('--- Error Sound ---\n');
-
-    const errorChoice = await select({
-      message: 'Select sound for errors:',
-      choices: [
-        ...bundled.error.map(s => ({
-          name: s.name + (current.error === s.name ? ' (current)' : ''),
-          value: s.name,
-          description: s.file
-        })),
-        { name: 'Custom file...', value: '__custom__' }
-      ]
+    // Preview
+    const preview = await p.confirm({
+      message: 'Preview this sound?',
+      initialValue: true
     });
 
-    if (errorChoice !== '__custom__') {
-      const preview = await confirm({
-        message: 'Preview this sound?',
-        default: true
-      });
+    if (preview && !p.isCancel(preview)) {
+      await playSound(eventType, soundChoice, { force: true });
+    }
 
-      if (preview) {
-        await playSound('error', errorChoice);
-      }
+    // Confirm
+    const useIt = await p.confirm({
+      message: `Use "${soundChoice}" for ${eventType}?`,
+      initialValue: true
+    });
 
-      const useIt = await confirm({
-        message: `Use "${errorChoice}" for errors?`,
-        default: true
-      });
-
-      if (useIt) {
-        setSelectedSound('error', errorChoice);
-        console.log(`\nSet error sound to: ${errorChoice}`);
-      }
-    } else {
-      console.log('\nTo use a custom sound, edit ~/.claudeding.json');
-      console.log('Set sounds.error to your file path.');
+    if (useIt && !p.isCancel(useIt)) {
+      setSelectedSound(eventType, soundChoice);
+      p.log.success(`Set ${eventType} sound to: ${soundChoice}`);
     }
   }
-
-  console.log('\nDone! Run "claudeding config" to see current settings.');
 }

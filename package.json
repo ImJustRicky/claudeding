@@ -1,6 +1,6 @@
 {
   "name": "@byricky/claudeding",
-  "version": "1.0.12",
+  "version": "1.0.14",
   "description": "Audio notifications for Claude Code - hear when tasks complete or need input",
   "type": "module",
   "bin": {
@@ -37,6 +37,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@clack/prompts": "^1.2.0",
     "commander": "^12.0.0",
     "inquirer": "^13.4.1"
   },

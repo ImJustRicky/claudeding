@@ -1,194 +1,132 @@
-import inquirer from 'inquirer';
+import * as p from '@clack/prompts';
 import { loadConfig, updateConfig } from '../lib/config.js';
 import { playSound } from '../lib/audio.js';
 
-const SETTINGS_MENU = [
-  { name: 'Volume', value: 'volume' },
-  { name: 'Focus Detection', value: 'focus' },
-  { name: 'AFK Timeout', value: 'afk' },
-  { name: 'Quiet Hours', value: 'quietHours' },
-  { name: 'System DND', value: 'dnd' },
-  { name: 'Easter Eggs (farts)', value: 'easterEggs' },
-  { name: 'Stats Logging', value: 'stats' },
-  new inquirer.Separator(),
-  { name: 'Back to main menu', value: 'back' }
-];
-
-async function volumeSetting() {
-  const config = loadConfig();
-  const { volume } = await inquirer.prompt([
-    {
-      type: 'number',
-      name: 'volume',
-      message: 'Volume (0-100):',
-      default: config.volume ?? 100,
-      validate: (v) => v >= 0 && v <= 100 ? true : 'Must be 0-100'
-    }
-  ]);
-  updateConfig({ volume });
-  console.log(`Volume set to ${volume}%`);
-
-  const { test } = await inquirer.prompt([
-    { type: 'confirm', name: 'test', message: 'Test sound?', default: true }
-  ]);
-  if (test) {
-    await playSound('complete', null, { force: true });
-  }
-}
-
-async function focusSetting() {
-  const config = loadConfig();
-  const { skipWhenFocused } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'skipWhenFocused',
-      message: 'Skip sounds when terminal is focused?',
-      default: config.skipWhenFocused !== false
-    }
-  ]);
-  updateConfig({ skipWhenFocused });
-  console.log(skipWhenFocused ? 'Focus detection enabled' : 'Focus detection disabled');
-}
-
-async function afkSetting() {
-  const config = loadConfig();
-  const { afkTimeout } = await inquirer.prompt([
-    {
-      type: 'number',
-      name: 'afkTimeout',
-      message: 'AFK timeout in seconds (0 to disable):',
-      default: config.afkTimeout ?? 30,
-      validate: (v) => v >= 0 ? true : 'Must be 0 or more'
-    }
-  ]);
-  updateConfig({ afkTimeout });
-  console.log(afkTimeout > 0 ? `AFK detection: ${afkTimeout}s` : 'AFK detection disabled');
-}
-
-async function quietHoursSetting() {
-  const config = loadConfig();
-  const qh = config.quietHours || {};
-
-  const { enabled } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'enabled',
-      message: 'Enable quiet hours?',
-      default: qh.enabled || false
-    }
-  ]);
-
-  if (!enabled) {
-    updateConfig({ quietHours: { enabled: false } });
-    console.log('Quiet hours disabled');
-    return;
-  }
-
-  const { start, end } = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'start',
-      message: 'Start time (24h format, e.g., 22:00):',
-      default: qh.start || '22:00',
-      validate: (v) => /^\d{1,2}:\d{2}$/.test(v) ? true : 'Use format HH:MM'
-    },
-    {
-      type: 'input',
-      name: 'end',
-      message: 'End time (24h format, e.g., 08:00):',
-      default: qh.end || '08:00',
-      validate: (v) => /^\d{1,2}:\d{2}$/.test(v) ? true : 'Use format HH:MM'
-    }
-  ]);
-
-  updateConfig({ quietHours: { enabled: true, start, end } });
-  console.log(`Quiet hours: ${start} - ${end}`);
-}
-
-async function dndSetting() {
-  const config = loadConfig();
-  const { respectDnd } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'respectDnd',
-      message: 'Respect system Do Not Disturb / Focus mode?',
-      default: config.respectDnd || false
-    }
-  ]);
-  updateConfig({ respectDnd });
-  console.log(respectDnd ? 'Will respect system DND' : 'Will ignore system DND');
-}
-
-async function easterEggsSetting() {
-  const config = loadConfig();
-  const { easterEggs } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'easterEggs',
-      message: 'Enable easter eggs? (1% chance of fart sounds)',
-      default: config.easterEggs || false
-    }
-  ]);
-  updateConfig({ easterEggs });
-  console.log(easterEggs ? 'Easter eggs enabled' : 'Easter eggs disabled');
-}
-
-async function statsSetting() {
-  const config = loadConfig();
-  const { logStats } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'logStats',
-      message: 'Log usage stats?',
-      default: config.logStats || false
-    }
-  ]);
-  updateConfig({ logStats });
-  console.log(logStats ? 'Stats logging enabled' : 'Stats logging disabled');
-}
-
 export default async function settings() {
-  console.log('\n  claudeding Settings\n');
+  p.intro('claudeding settings');
 
   while (true) {
     const config = loadConfig();
+    const { checkHooksInstalled } = await import('../lib/hooks.js');
+    const hooks = checkHooksInstalled();
+    const thinkingEnabled = hooks.userPromptSubmit;
 
-    // Show current status
-    console.log('  Current:');
-    console.log(`    Volume: ${config.volume ?? 100}%`);
-    console.log(`    Focus detection: ${config.skipWhenFocused !== false ? 'on' : 'off'}`);
-    console.log(`    AFK timeout: ${config.afkTimeout ?? 30}s`);
-    console.log(`    Quiet hours: ${config.quietHours?.enabled ? `${config.quietHours.start}-${config.quietHours.end}` : 'off'}`);
-    console.log(`    Respect DND: ${config.respectDnd ? 'on' : 'off'}`);
-    console.log(`    Easter eggs: ${config.easterEggs ? 'on' : 'off'}`);
-    console.log(`    Stats: ${config.logStats ? 'on' : 'off'}`);
-    console.log('');
+    const choice = await p.select({
+      message: 'What would you like to configure?',
+      options: [
+        { value: 'volume', label: `Volume: ${config.volume ?? 100}%`, hint: 'How loud notifications play' },
+        { value: 'sounds', label: 'Pick sounds', hint: 'Choose different notification sounds' },
+        { value: 'focus', label: `Skip when focused: ${config.skipWhenFocused !== false ? 'on' : 'off'}`, hint: 'No sound if terminal is visible' },
+        { value: 'afk', label: `AFK override: ${config.afkTimeout > 0 ? config.afkTimeout + 's' : 'off'}`, hint: 'Play anyway if idle this long' },
+        { value: 'quietHours', label: `Quiet hours: ${config.quietHours?.enabled ? config.quietHours.start + '-' + config.quietHours.end : 'off'}`, hint: 'Auto-mute during set hours' },
+        { value: 'dnd', label: `Respect system DND: ${config.respectDnd ? 'on' : 'off'}`, hint: 'Mute when macOS Focus is on' },
+        { value: 'thinking', label: `Jeopardy thinking music: ${thinkingEnabled ? 'on' : 'off'}`, hint: 'Play music while Claude thinks' },
+        { value: 'easterEggs', label: `Fart easter eggs: ${config.easterEggs ? 'on' : 'off'}`, hint: '1% chance of a fart sound' },
+        { value: 'stats', label: `Usage stats: ${config.logStats ? 'on' : 'off'}`, hint: 'Log events for statistics' },
+        { value: 'done', label: 'Exit' }
+      ]
+    });
 
-    const { setting } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'setting',
-        message: 'What would you like to configure?',
-        choices: SETTINGS_MENU
-      }
-    ]);
-
-    if (setting === 'back') break;
-
-    console.log('');
-
-    switch (setting) {
-      case 'volume': await volumeSetting(); break;
-      case 'focus': await focusSetting(); break;
-      case 'afk': await afkSetting(); break;
-      case 'quietHours': await quietHoursSetting(); break;
-      case 'dnd': await dndSetting(); break;
-      case 'easterEggs': await easterEggsSetting(); break;
-      case 'stats': await statsSetting(); break;
+    if (p.isCancel(choice) || choice === 'done') {
+      p.outro('Settings saved!');
+      return;
     }
 
-    console.log('');
-  }
+    switch (choice) {
+      case 'volume':
+        const vol = await p.text({
+          message: 'Volume (0-100):',
+          initialValue: String(config.volume ?? 100),
+          validate: (v) => {
+            const n = parseInt(v);
+            if (isNaN(n) || n < 0 || n > 100) return 'Enter 0-100';
+          }
+        });
+        if (!p.isCancel(vol)) {
+          updateConfig({ volume: parseInt(vol) });
+          const test = await p.confirm({ message: 'Test it?' });
+          if (test && !p.isCancel(test)) {
+            await playSound('complete', null, { force: true });
+          }
+        }
+        break;
 
-  console.log('Settings saved!\n');
+      case 'sounds':
+        const soundsCmd = await import('./sounds.js');
+        await soundsCmd.default();
+        break;
+
+      case 'focus':
+        const newFocus = !(config.skipWhenFocused !== false);
+        updateConfig({ skipWhenFocused: newFocus });
+        p.log.success(`Skip when focused: ${newFocus ? 'on' : 'off'}`);
+        break;
+
+      case 'afk':
+        p.log.info('Play sound if idle this long, even when focused');
+        const afk = await p.text({
+          message: 'Seconds (0 = off):',
+          initialValue: String(config.afkTimeout ?? 30),
+          validate: (v) => {
+            const n = parseInt(v);
+            if (isNaN(n) || n < 0) return 'Enter 0 or more';
+          }
+        });
+        if (!p.isCancel(afk)) {
+          updateConfig({ afkTimeout: parseInt(afk) });
+        }
+        break;
+
+      case 'quietHours':
+        const qh = config.quietHours || {};
+        const qhEnabled = await p.confirm({
+          message: 'Enable quiet hours?',
+          initialValue: qh.enabled || false
+        });
+        if (p.isCancel(qhEnabled)) break;
+        if (!qhEnabled) {
+          updateConfig({ quietHours: { enabled: false } });
+        } else {
+          const start = await p.text({
+            message: 'Start time (e.g., 22:00):',
+            initialValue: qh.start || '22:00'
+          });
+          if (p.isCancel(start)) break;
+          const end = await p.text({
+            message: 'End time (e.g., 08:00):',
+            initialValue: qh.end || '08:00'
+          });
+          if (p.isCancel(end)) break;
+          updateConfig({ quietHours: { enabled: true, start, end } });
+        }
+        break;
+
+      case 'dnd':
+        const newDnd = !config.respectDnd;
+        updateConfig({ respectDnd: newDnd });
+        p.log.success(`Respect system DND: ${newDnd ? 'on' : 'off'}`);
+        break;
+
+      case 'thinking':
+        const { enable, disable } = await import('./toggle.js');
+        if (thinkingEnabled) {
+          await disable('thinking');
+        } else {
+          await enable('thinking');
+        }
+        break;
+
+      case 'easterEggs':
+        const newEggs = !config.easterEggs;
+        updateConfig({ easterEggs: newEggs });
+        p.log.success(`Fart easter eggs: ${newEggs ? 'on' : 'off'}`);
+        break;
+
+      case 'stats':
+        const newStats = !config.logStats;
+        updateConfig({ logStats: newStats });
+        p.log.success(`Usage stats: ${newStats ? 'on' : 'off'}`);
+        break;
+    }
+  }
 }
