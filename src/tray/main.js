@@ -1,19 +1,36 @@
 import { app, Tray, Menu, nativeImage } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { execSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, watchFile, unlinkSync } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { existsSync, readFileSync, watchFile, unlinkSync } from 'fs';
 import { homedir } from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const execAsync = promisify(exec);
 
 const CONFIG_PATH = join(homedir(), '.claudeding.json');
 const SNOOZE_FILE = join(homedir(), '.claudeding-snooze');
 const LAST_EVENT_FILE = join(homedir(), '.claudeding-lastevent');
 
-const EVENT_TIMEOUT = 30000; // Show event icon for 30 seconds
+const EVENT_TIMEOUT = 30000;
+const TICK_INTERVAL = 5000;
+const ACTIVE_CACHE_TTL = 10000;
+
+const TERMINAL_APPS = [
+  'terminal', 'iterm', 'hyper', 'alacritty', 'kitty', 'warp',
+  'wezterm', 'tabby', 'cursor', 'code', 'visual studio code',
+  'zed', 'ghostty', 'rio',
+];
 
 let tray = null;
+let lastSignature = null;
+let activeCache = { value: false, fetchedAt: 0, inflight: null };
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
 
 function loadConfig() {
   try {
@@ -43,11 +60,7 @@ function getLastEvent() {
   try {
     if (!existsSync(LAST_EVENT_FILE)) return null;
     const data = JSON.parse(readFileSync(LAST_EVENT_FILE, 'utf-8'));
-
-    // Only return if event is recent (within timeout)
-    if (Date.now() - data.time < EVENT_TIMEOUT) {
-      return data;
-    }
+    if (Date.now() - data.time < EVENT_TIMEOUT) return data;
     return null;
   } catch {
     return null;
@@ -56,52 +69,57 @@ function getLastEvent() {
 
 function clearLastEvent() {
   try {
-    if (existsSync(LAST_EVENT_FILE)) {
-      unlinkSync(LAST_EVENT_FILE);
-    }
+    if (existsSync(LAST_EVENT_FILE)) unlinkSync(LAST_EVENT_FILE);
   } catch {}
 }
 
-function isTerminalFocused() {
-  const terminalApps = [
-    'terminal', 'iterm', 'hyper', 'alacritty', 'kitty', 'warp',
-    'wezterm', 'tabby', 'cursor', 'code', 'visual studio code',
-    'zed', 'ghostty', 'rio'
-  ];
-
+async function checkTerminalFocused() {
   try {
-    const result = execSync(
+    const { stdout } = await execAsync(
       'lsappinfo info -only name "$(lsappinfo front)" 2>/dev/null || echo ""',
-      { encoding: 'utf-8', shell: '/bin/bash' }
-    ).toLowerCase();
-
-    return terminalApps.some(app => result.includes(app));
+      { shell: '/bin/bash', timeout: 2000 },
+    );
+    const result = stdout.toLowerCase();
+    return TERMINAL_APPS.some((a) => result.includes(a));
   } catch {
     return false;
   }
 }
 
-function getIdleSeconds() {
+async function checkIdleSeconds() {
   try {
-    const idle = execSync(
+    const { stdout } = await execAsync(
       "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'",
-      { encoding: 'utf-8', shell: '/bin/bash' }
-    ).trim();
-    return parseInt(idle, 10) || 0;
+      { shell: '/bin/bash', timeout: 2000 },
+    );
+    return parseInt(stdout.trim(), 10) || 0;
   } catch {
     return 0;
   }
 }
 
-function isUserActive() {
+async function refreshUserActive() {
   const config = loadConfig();
   const afkTimeout = config.afkTimeout ?? 30;
+  const [focused, idle] = await Promise.all([checkTerminalFocused(), checkIdleSeconds()]);
+  return focused && idle < afkTimeout;
+}
 
-  // User is active if terminal is focused AND not AFK
-  if (isTerminalFocused() && getIdleSeconds() < afkTimeout) {
-    return true;
+function getUserActiveCached() {
+  const now = Date.now();
+  if (now - activeCache.fetchedAt < ACTIVE_CACHE_TTL) return activeCache.value;
+  if (!activeCache.inflight) {
+    activeCache.inflight = refreshUserActive()
+      .then((v) => {
+        activeCache.value = v;
+        activeCache.fetchedAt = Date.now();
+      })
+      .catch(() => {})
+      .finally(() => {
+        activeCache.inflight = null;
+      });
   }
-  return false;
+  return activeCache.value;
 }
 
 function getEventIcon(event) {
@@ -114,22 +132,14 @@ function getEventIcon(event) {
 }
 
 function runCommand(cmd) {
-  try {
-    execSync(`claudeding ${cmd}`, { encoding: 'utf-8' });
-  } catch (err) {
-    console.error('Command failed:', err.message);
-  }
+  exec(`claudeding ${cmd}`, (err) => {
+    if (err) console.error('Command failed:', err.message);
+  });
 }
 
-function getStatusText() {
-  const config = loadConfig();
-  const snoozeRemaining = getSnoozeRemaining();
-
-  if (snoozeRemaining) {
-    return `Snoozing (${snoozeRemaining})`;
-  } else if (config.mute) {
-    return 'Muted';
-  }
+function getStatusText(config, snoozeRemaining) {
+  if (snoozeRemaining) return `Snoozing (${snoozeRemaining})`;
+  if (config.mute) return 'Muted';
   return 'Active';
 }
 
@@ -138,25 +148,19 @@ function formatTime(timestamp) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function buildMenu() {
-  const config = loadConfig();
-  const snoozeRemaining = getSnoozeRemaining();
-  const lastEvent = getLastEvent();
+function buildMenu(state) {
+  const { config, snoozeRemaining, lastEvent } = state;
   const isMuted = config.mute === true;
   const isSnoozing = snoozeRemaining !== null;
 
   const menuItems = [
-    {
-      label: `claudeding - ${getStatusText()}`,
-      enabled: false
-    },
+    { label: `claudeding - ${getStatusText(config, snoozeRemaining)}`, enabled: false },
   ];
 
-  // Show last event if recent
   if (lastEvent) {
     menuItems.push({
       label: `${getEventIcon(lastEvent.event)} ${lastEvent.event}${lastEvent.project ? ` (${lastEvent.project})` : ''} at ${formatTime(lastEvent.time)}`,
-      enabled: false
+      enabled: false,
     });
   }
 
@@ -166,117 +170,107 @@ function buildMenu() {
       label: isMuted ? '🔊 Unmute Sounds' : '🔇 Mute Sounds',
       click: () => {
         runCommand(isMuted ? 'mute --off' : 'mute --on');
-        updateMenu();
-      }
+        scheduleUpdate();
+      },
     },
     { type: 'separator' },
     {
       label: 'Snooze',
       submenu: [
-        {
-          label: '15 minutes',
-          click: () => { runCommand('snooze 15m'); updateMenu(); }
-        },
-        {
-          label: '30 minutes',
-          click: () => { runCommand('snooze 30m'); updateMenu(); }
-        },
-        {
-          label: '1 hour',
-          click: () => { runCommand('snooze 1h'); updateMenu(); }
-        },
-        {
-          label: '2 hours',
-          click: () => { runCommand('snooze 2h'); updateMenu(); }
-        },
+        { label: '15 minutes', click: () => { runCommand('snooze 15m'); scheduleUpdate(); } },
+        { label: '30 minutes', click: () => { runCommand('snooze 30m'); scheduleUpdate(); } },
+        { label: '1 hour', click: () => { runCommand('snooze 1h'); scheduleUpdate(); } },
+        { label: '2 hours', click: () => { runCommand('snooze 2h'); scheduleUpdate(); } },
         { type: 'separator' },
         {
           label: isSnoozing ? `Cancel Snooze (${snoozeRemaining} left)` : 'Not snoozing',
           enabled: isSnoozing,
-          click: () => { runCommand('snooze --off'); updateMenu(); }
-        }
-      ]
+          click: () => { runCommand('snooze --off'); scheduleUpdate(); },
+        },
+      ],
     },
     { type: 'separator' },
     {
       label: 'Test Sounds',
       submenu: [
-        {
-          label: 'Play Complete',
-          click: () => runCommand('play complete --force')
-        },
-        {
-          label: 'Play Feedback',
-          click: () => runCommand('play feedback --force')
-        },
-        {
-          label: 'Play Error',
-          click: () => runCommand('play error --force')
-        }
-      ]
+        { label: 'Play Complete', click: () => runCommand('play complete --force') },
+        { label: 'Play Feedback', click: () => runCommand('play feedback --force') },
+        { label: 'Play Error', click: () => runCommand('play error --force') },
+      ],
     },
     { type: 'separator' },
-    {
-      label: 'Quit Menu Bar',
-      click: () => app.quit()
-    }
+    { label: 'Quit Menu Bar', click: () => app.quit() },
   ]);
 }
 
-function updateMenu() {
-  if (tray) {
-    const config = loadConfig();
-    const snoozeRemaining = getSnoozeRemaining();
-    let lastEvent = getLastEvent();
-
-    // If user is back at terminal and active, clear the event notification
-    if (lastEvent && isUserActive()) {
-      clearLastEvent();
-      lastEvent = null;
-    }
-
-    tray.setContextMenu(buildMenu());
-
-    // Update title to show status
-    // Priority: recent event > snoozing > muted > idle
-    if (lastEvent) {
-      tray.setTitle(getEventIcon(lastEvent.event));
-    } else if (snoozeRemaining) {
-      tray.setTitle('💤');
-    } else if (config.mute) {
-      tray.setTitle('🔇');
-    } else {
-      tray.setTitle('🔔');
-    }
+function computeState() {
+  const config = loadConfig();
+  const snoozeRemaining = getSnoozeRemaining();
+  let lastEvent = getLastEvent();
+  if (lastEvent && getUserActiveCached()) {
+    clearLastEvent();
+    lastEvent = null;
   }
+  return { config, snoozeRemaining, lastEvent };
+}
+
+function signatureOf(state) {
+  const { config, snoozeRemaining, lastEvent } = state;
+  return JSON.stringify({
+    mute: !!config.mute,
+    snooze: snoozeRemaining,
+    event: lastEvent ? `${lastEvent.event}|${lastEvent.project ?? ''}|${lastEvent.time}` : null,
+  });
+}
+
+function titleFor(state) {
+  const { config, snoozeRemaining, lastEvent } = state;
+  if (lastEvent) return getEventIcon(lastEvent.event);
+  if (snoozeRemaining) return '💤';
+  if (config.mute) return '🔇';
+  return '🔔';
+}
+
+let pendingUpdate = null;
+function scheduleUpdate() {
+  if (pendingUpdate) return;
+  pendingUpdate = setImmediate(() => {
+    pendingUpdate = null;
+    updateMenu();
+  });
+}
+
+function updateMenu() {
+  if (!tray) return;
+  const state = computeState();
+  const sig = signatureOf(state);
+  if (sig === lastSignature) return;
+  lastSignature = sig;
+  tray.setContextMenu(buildMenu(state));
+  tray.setTitle(titleFor(state));
 }
 
 app.whenReady().then(() => {
-  // Hide dock icon
   app.dock?.hide();
 
-  // Create tray with empty icon (we use title instead)
   tray = new Tray(nativeImage.createEmpty());
-  tray.setTitle('🔔');
   tray.setToolTip('claudeding');
-  tray.setContextMenu(buildMenu());
+
+  const state = computeState();
+  lastSignature = signatureOf(state);
+  tray.setContextMenu(buildMenu(state));
+  tray.setTitle(titleFor(state));
 
   console.log('claudeding menu bar is ready');
 
-  // Watch config for changes
-  watchFile(CONFIG_PATH, { interval: 1000 }, () => {
-    updateMenu();
-  });
+  watchFile(CONFIG_PATH, { interval: 1000 }, scheduleUpdate);
+  watchFile(LAST_EVENT_FILE, { interval: 500 }, scheduleUpdate);
 
-  // Watch last event file for changes (hook events)
-  watchFile(LAST_EVENT_FILE, { interval: 500 }, () => {
-    updateMenu();
-  });
-
-  // Regular update to catch snooze/event expiry
-  setInterval(updateMenu, 2000);
+  setInterval(updateMenu, TICK_INTERVAL);
 });
 
 app.on('window-all-closed', (e) => {
   e.preventDefault();
 });
+
+app.on('second-instance', () => {});

@@ -371,6 +371,113 @@ claudeding adds hooks to your Claude Code settings (`~/.claude/settings.json`):
 
 Your existing hooks are preserved. A backup is created at `~/.claude/settings.json.claudeding-backup` before any modifications.
 
+## Troubleshooting
+
+### Install the hooks manually
+
+If `claudeding setup` didn't run, didn't finish, or you want to install into a specific scope, edit the settings file directly. Claude Code reads hooks from:
+
+| File | Scope |
+|------|-------|
+| `~/.claude/settings.json` | All projects (user) |
+| `.claude/settings.json` | Single project (shareable — commit to repo) |
+| `.claude/settings.local.json` | Single project (gitignored) |
+
+Add (or merge into) the top-level `"hooks"` key:
+
+```json
+{
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "claudeding play feedback" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "claudeding play complete" }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "claudeding play error" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Notes, straight from the [Claude Code hooks docs](https://docs.claude.com/en/docs/claude-code/hooks):
+
+- `Stop` fires whenever Claude finishes responding. It ignores matchers — you can omit `matcher` entirely.
+- `Notification` matchers are optional. `""` (or omitting) fires on every notification; set to e.g. `"permission_prompt"` or `"idle_prompt"` to filter.
+- `PostToolUseFailure` fires after a tool call fails. Set `matcher` to a tool name (e.g. `"Bash"`) if you want to scope it.
+
+Opt-in extras that `claudeding setup` does **not** enable by default:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "claudeding play thinking" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "", "hooks": [{ "type": "command", "command": "claudeding stop-thinking" }] }
+    ]
+  }
+}
+```
+
+Enable them with `claudeding enable thinking`.
+
+### Hooks installed but nothing happens
+
+Run `claudeding doctor` first — it reports what's missing. Then check the usual suspects:
+
+- **`claudeding` not on Claude Code's `PATH`.** The hook fires, but the command can't be resolved. Test with `which claudeding` from a fresh terminal; if it's missing, reinstall globally (`npm install -g @byricky/claudeding`) or replace `"command": "claudeding …"` with the absolute path.
+- **`~/.claude/settings.json` has invalid JSON.** One stray comma and Claude Code skips the file. Validate with `node -e 'JSON.parse(require("fs").readFileSync(process.env.HOME + "/.claude/settings.json","utf8"))'`.
+- **Hook entries were added mid-session.** Start a new Claude Code session after editing `settings.json`.
+- **You're muted / snoozed.** `claudeding status` shows both. Fix with `claudeding mute --off` / `claudeding snooze --off`.
+- **Terminal focused + not AFK.** By design. Disable with `skipWhenFocused: false`, or lower/disable `afkTimeout` in `~/.claudeding.json`.
+- **Quiet hours / system DND.** Check `quietHours` and `respectDnd` in config.
+- **Volume is 0.** `claudeding settings` → Volume.
+
+### Sounds play in terminal but not from Claude Code
+
+Same PATH issue as above, 95% of the time. Claude Code's hook shell may not load your interactive shell init (e.g. `nvm`-managed `node` not being visible). Fix by using the absolute path to `claudeding` in the hook `command`.
+
+### Menu bar tray is sluggish or shows "Not Responding"
+
+Update to the latest version — the tray now runs its focus/idle checks asynchronously with a 10s cache and skips menu rebuilds when nothing has changed. Older versions blocked the Electron main thread every 2 seconds.
+
+If you suspect multiple trays are running:
+
+```bash
+pgrep -fl "Electron.*src/tray/main\.js"
+pkill  -f  "Electron.*src/tray/main\.js"
+claudeding tray
+```
+
+The current build holds a single-instance lock, so duplicate launches exit immediately.
+
+### Start over cleanly
+
+```bash
+claudeding uninstall   # removes only claudeding's hooks
+claudeding setup       # reinstalls them
+```
+
+`claudeding uninstall` leaves `~/.claude/settings.json.claudeding-backup` in place — restore it with `cp ~/.claude/settings.json.claudeding-backup ~/.claude/settings.json` if anything got mangled.
+
 ## License
 
 MIT
