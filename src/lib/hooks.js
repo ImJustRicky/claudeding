@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
@@ -77,6 +77,7 @@ function loadSettings() {
 }
 
 function saveSettings(settings) {
+  mkdirSync(CLAUDE_DIR, { recursive: true });
   writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2) + '\n');
 }
 
