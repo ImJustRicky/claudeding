@@ -2,7 +2,7 @@ import { spawn, execSync } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { platform } from 'os';
-import { confirm } from '@inquirer/prompts';
+import { confirm } from '@clack/prompts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

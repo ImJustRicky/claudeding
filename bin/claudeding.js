@@ -18,7 +18,7 @@ import stopThinkingCmd from '../src/commands/stopThinking.js';
 program
   .name('claudeding')
   .description('Audio notifications for Claude Code')
-  .version('1.0.16')
+  .version('1.0.17')
   .addHelpText('after', `
 Examples:
   $ claudeding setup          # First-time setup
